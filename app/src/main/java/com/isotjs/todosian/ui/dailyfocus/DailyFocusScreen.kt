@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -139,26 +143,7 @@ fun DailyFocusScreen(
                     .padding(bottom = 16.dp)
                     .verticalScroll(scrollState),
             ) {
-                Text(
-                    text = stringResource(R.string.category_edit_todo_title),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = sheetText,
-                    onValueChange = { sheetText = it },
-                    singleLine = true,
-                    label = { Text(text = stringResource(R.string.category_edit_todo_hint)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .bringIntoViewRequester(todoTextBringIntoView)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) {
-                                scope.launch { todoTextBringIntoView.bringIntoView() }
-                            }
-                        },
-                )
-
+                // Shared by the Save button and every field's keyboard ✓ action.
                 // Shared by the Save button and the note field's keyboard ✓ action.
                 val saveSheet: () -> Unit = {
                     val task = sheetTask
@@ -174,6 +159,31 @@ fun DailyFocusScreen(
                         }
                     }
                 }
+
+                Text(
+                    text = stringResource(R.string.category_edit_todo_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = sheetText,
+                    onValueChange = { sheetText = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(R.string.category_edit_todo_hint)) },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { saveSheet() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(todoTextBringIntoView)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch { todoTextBringIntoView.bringIntoView() }
+                            }
+                        },
+                )
 
                 if (settings.enableTasksPluginSupport) {
                     Spacer(modifier = Modifier.height(12.dp))

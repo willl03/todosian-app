@@ -60,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
@@ -98,6 +99,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import java.time.LocalDate
 
@@ -241,27 +243,6 @@ fun CategoryScreen(
                     .padding(bottom = 16.dp)
                     .verticalScroll(scrollState),
             ) {
-                Text(
-                    text = stringResource(titleRes),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = sheetText,
-                    onValueChange = { sheetText = it },
-                    singleLine = true,
-                    label = { Text(text = stringResource(hintRes)) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .bringIntoViewRequester(todoTextBringIntoView)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) {
-                                scope.launch { todoTextBringIntoView.bringIntoView() }
-                            }
-                        },
-                )
-
                 // Shared by the Save button and the note field's keyboard ✓ action.
                 val saveSheet: () -> Unit = {
                     if (sheetText.trim().isNotEmpty()) {
@@ -303,6 +284,31 @@ fun CategoryScreen(
                         }
                     }
                 }
+
+                Text(
+                    text = stringResource(titleRes),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = sheetText,
+                    onValueChange = { sheetText = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(hintRes)) },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { saveSheet() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bringIntoViewRequester(todoTextBringIntoView)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch { todoTextBringIntoView.bringIntoView() }
+                            }
+                        },
+                )
 
                 if (settings.enableTasksPluginSupport) {
                     Spacer(modifier = Modifier.height(12.dp))
