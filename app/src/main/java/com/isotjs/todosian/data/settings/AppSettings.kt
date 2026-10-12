@@ -35,6 +35,7 @@ enum class TodoGrouping {
 enum class TodoSort {
     FILE_ORDER,
     PRIORITY_HIGH_TO_LOW,
+    DUE_DATE_THEN_PRIORITY,
     CREATED_DATE_NEWEST_FIRST,
     DUE_DATE_EARLIEST_FIRST,
 }
