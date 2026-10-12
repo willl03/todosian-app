@@ -43,8 +43,9 @@ interface FileRepository {
     /** Every list in the vault, flattened across folders (for widgets, daily focus, pickers). */
     suspend fun getAllLists(): Result<List<TodoList>>
 
-    /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder). */
-    suspend fun getListsIn(parentUri: Uri): Result<List<TodoList>>
+    /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder),
+     *  ordered by the manual order file for [parentPath] ("" = unfiled), then A–Z. */
+    suspend fun getListsIn(parentUri: Uri, parentPath: String): Result<List<TodoList>>
 
     suspend fun readLines(uri: Uri): Result<List<String>>
 
@@ -79,6 +80,15 @@ interface FileRepository {
 
     suspend fun copyTodoLine(sourceUri: Uri, targetUri: Uri, lineIndex: Int): Result<Unit>
 
+    /**
+     * Persists a manual folder order (complete list of folder names, all existing ones). The
+     * order file is a preference snapshot; nothing else in the vault is modified.
+     */
+    suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit>
+
+    /** Persists a manual list order for [parentPath] ("" = unfiled). */
+    suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit>
+
     fun hasPersistedReadWritePermission(uri: Uri): Boolean
 
     suspend fun countMarkdownFiles(folderUri: Uri): Result<Int>
@@ -93,6 +103,7 @@ class SafFileRepository(
     private val preferencesManager: PreferencesManager,
 ) : FileRepository {
 
+    private val orderStore = ListOrderStore(appContext)
     private val widgetUpdateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fileMutex = Mutex()
 
@@ -180,6 +191,9 @@ class SafFileRepository(
                 val root = DocumentFile.fromTreeUri(appContext, folderUri)
                     ?: throw IllegalStateException("Invalid folder URI")
 
+                // Manual order preference (best-effort); absent/corrupt file = plain A–Z.
+                val order = orderStore.read(folderUri)
+
                 val children = root.listFiles()
                 val folders = children.asSequence()
                     .filter { it.isDirectory }
@@ -192,21 +206,39 @@ class SafFileRepository(
                                 .asSequence()
                                 .filter { it.isFile }
                                 .mapNotNull { parseListFile(it) }
-                                .sortedBy { it.displayName.lowercase() }
                                 .toList(),
                         )
                     }
                     .filter { it.displayName.isNotEmpty() }
-                    .sortedBy { it.displayName.lowercase() }
                     .toList()
+
+                val orderedFolders = ListOrder.effective(
+                    items = folders,
+                    keyOf = { it.displayName },
+                    storedKeys = order?.folders ?: emptyList(),
+                ).map { folder ->
+                    folder.copy(
+                        lists = ListOrder.effective(
+                            items = folder.lists,
+                            keyOf = { it.displayName },
+                            storedKeys = order?.lists?.get(folder.displayName) ?: emptyList(),
+                        ),
+                    )
+                }
 
                 val unfiledLists = children.asSequence()
                     .filter { it.isFile }
                     .mapNotNull { parseListFile(it) }
-                    .sortedBy { it.displayName.lowercase() }
                     .toList()
 
-                VaultContent(folders = folders, unfiledLists = unfiledLists)
+                VaultContent(
+                    folders = orderedFolders,
+                    unfiledLists = ListOrder.effective(
+                        items = unfiledLists,
+                        keyOf = { it.displayName },
+                        storedKeys = order?.lists?.get(ListOrder.UNFILED_KEY) ?: emptyList(),
+                    ),
+                )
             }
         }
     }
@@ -215,7 +247,7 @@ class SafFileRepository(
         return getVaultContent().mapCatching { it.allLists() }
     }
 
-    override suspend fun getListsIn(parentUri: Uri): Result<List<TodoList>> {
+    override suspend fun getListsIn(parentUri: Uri, parentPath: String): Result<List<TodoList>> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 // Works for both the vault root tree URI and a folder's document URI:
@@ -223,12 +255,19 @@ class SafFileRepository(
                 val parent = DocumentFile.fromTreeUri(appContext, parentUri)
                     ?: throw IllegalStateException("Invalid folder URI")
 
-                parent.listFiles()
+                val order = getFolderUri()?.let { orderStore.read(it) }
+
+                val lists = parent.listFiles()
                     .asSequence()
                     .filter { it.isFile }
                     .mapNotNull { parseListFile(it) }
-                    .sortedBy { it.displayName.lowercase() }
                     .toList()
+
+                ListOrder.effective(
+                    items = lists,
+                    keyOf = { it.displayName },
+                    storedKeys = order?.lists?.get(parentPath) ?: emptyList(),
+                )
             }
         }
     }
@@ -485,6 +524,16 @@ class SafFileRepository(
                 writeLinesInternal(targetUri, updated.second)
             }
         }
+    }
+
+    override suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit> {
+        val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
+        return orderStore.write(folderUri) { it.withFolderOrder(orderedFolderPaths) }
+    }
+
+    override suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit> {
+        val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
+        return orderStore.write(folderUri) { it.withListOrder(parentPath, orderedListNames) }
     }
 
     override fun hasPersistedReadWritePermission(uri: Uri): Boolean {

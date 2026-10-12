@@ -110,6 +110,30 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Finalizes a drag: moves the folder [fromIndex] → [toIndex] in the visible order and
+     * persists the new preference. The folders list is the complete set of existing folders,
+     * which also prunes deleted entries from the order file (a preference snapshot, written on
+     * drags only). On failure the order reverts via a fresh scan.
+     */
+    fun dropFolder(fromIndex: Int, toIndex: Int) {
+        val folders = _uiState.value.folders.toMutableList()
+        if (fromIndex !in folders.indices || toIndex !in folders.indices) return
+
+        val folder = folders.removeAt(fromIndex)
+        folders.add(toIndex, folder)
+        _uiState.value = _uiState.value.copy(folders = folders)
+
+        viewModelScope.launch {
+            val names = folders.map { it.displayName }
+            val result = fileRepository.reorderFolders(names)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_reorder_failed))
+                refresh(showLoading = false)
+            }
+        }
+    }
+
     sealed interface Event {
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
         data object RequireOnboarding : Event

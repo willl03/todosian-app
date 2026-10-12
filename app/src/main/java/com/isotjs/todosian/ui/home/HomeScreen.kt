@@ -23,7 +23,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
@@ -81,9 +84,12 @@ import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
+import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
+import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
+import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.todosianFabShape
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -376,23 +382,35 @@ fun HomeScreen(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
-        // Folders A–Z (the repository already returns them sorted); "Unfiled lists" is the
-        // last row so its position matches the folder pager, where it is the rightmost page.
+        // Folders A–Z (or manual order via the reorder feature); "Unfiled lists" is the last
+        // row so its position matches the folder pager, where it is the rightmost page. It is
+        // a virtual pseudo-folder: fixed at the bottom, not reorderable.
         val vaultRootUri = fileRepository.getFolderUri()
-        val rows = remember(uiState.folders, uiState.unfiledLists, vaultRootUri) {
-            buildList {
-                addAll(uiState.folders)
-                if (uiState.unfiledLists.isNotEmpty() && vaultRootUri != null) {
-                    add(
-                        Folder(
-                            displayName = "",
-                            uri = vaultRootUri,
-                            lists = uiState.unfiledLists,
-                            isUnfiled = true,
-                        ),
-                    )
-                }
+        val unfiledFolder = remember(uiState.unfiledLists, vaultRootUri) {
+            if (uiState.unfiledLists.isNotEmpty() && vaultRootUri != null) {
+                Folder(
+                    displayName = "",
+                    uri = vaultRootUri,
+                    lists = uiState.unfiledLists,
+                    isUnfiled = true,
+                )
+            } else {
+                null
             }
+        }
+        val rows = remember(uiState.folders, unfiledFolder) {
+            uiState.folders + listOfNotNull(unfiledFolder)
+        }
+
+        val listState = rememberLazyListState()
+        val dragState = remember(listState) {
+            DragReorderState(
+                listState = listState,
+                scope = scope,
+                // Only real folders are drop targets; the fixed unfiled pseudo-row is not.
+                onDrop = { from, to -> viewModel.dropFolder(from, to) },
+                canTarget = { key -> key != vaultRootUri.toString() },
+            )
         }
 
         val contentState = remember(uiState.isLoading, rows.isEmpty()) {
@@ -465,30 +483,53 @@ fun HomeScreen(
                         }
 
                         LazyColumn(
+                            state = listState,
                             contentPadding = PaddingValues(bottom = 96.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            items(
-                                items = rows,
-                                key = { it.uri.toString() },
-                            ) { folder ->
-                                FolderRow(
-                                    folder = folder,
-                                    onClick = { onOpenFolder(folder) },
-                                    onRename = {
-                                        renameTarget = folder
-                                        renameValue = folder.displayName
-                                    },
-                                    onDelete = { deleteTarget = folder },
-                                    modifier = Modifier.animateItem(
+                            itemsIndexed(
+                                items = uiState.folders,
+                                key = { _, folder -> folder.uri.toString() },
+                            ) { _, folder ->
+                                val rowKey = folder.uri.toString()
+                                Column(modifier = Modifier.animateItem(
+                                    fadeInSpec = tween(durationMillis = 180),
+                                    placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                                    fadeOutSpec = tween(durationMillis = 160),
+                                )) {
+                                    DragReorderIndicatorSlot(dragState, rowKey)
+                                    FolderRow(
+                                        folder = folder,
+                                        onClick = { onOpenFolder(folder) },
+                                        onRename = {
+                                            renameTarget = folder
+                                            renameValue = folder.displayName
+                                        },
+                                        onDelete = { deleteTarget = folder },
+                                        modifier = Modifier.dragReorderable(dragState, rowKey),
+                                    )
+                                    DragReorderIndicatorSlot(dragState, rowKey, below = true)
+                                }
+                            }
+                            if (unfiledFolder != null) {
+                                item(key = unfiledFolder.uri.toString()) {
+                                    val rowKey = unfiledFolder.uri.toString()
+                                    Column(modifier = Modifier.animateItem(
                                         fadeInSpec = tween(durationMillis = 180),
-                                        placementSpec = spring(
-                                            stiffness = Spring.StiffnessMediumLow,
-                                        ),
+                                        placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
                                         fadeOutSpec = tween(durationMillis = 160),
-                                    ),
-                                )
+                                    )) {
+                                        DragReorderIndicatorSlot(dragState, rowKey)
+                                        FolderRow(
+                                            folder = unfiledFolder,
+                                            onClick = { onOpenFolder(unfiledFolder) },
+                                            onRename = {},
+                                            onDelete = {},
+                                        )
+                                        DragReorderIndicatorSlot(dragState, rowKey, below = true)
+                                    }
+                                }
                             }
                         }
                     }

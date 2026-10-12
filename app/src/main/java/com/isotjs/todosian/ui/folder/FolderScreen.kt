@@ -2,6 +2,9 @@ package com.isotjs.todosian.ui.folder
 
 import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -76,9 +82,12 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
+import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
+import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.todosianFabShape
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,6 +121,8 @@ class FolderViewModel(
     private val fileRepository: FileRepository,
     private val folderUri: Uri,
     val isUnfiled: Boolean,
+    /** Order-file key for this folder's lists: the folder name, "" for unfiled. */
+    private val folderPath: String,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FolderUiState())
@@ -147,7 +158,7 @@ class FolderViewModel(
             val folderName = if (isUnfiled) "" else {
                 fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
             }
-            val listsResult = fileRepository.getListsIn(folderUri)
+            val listsResult = fileRepository.getListsIn(folderUri, folderPath)
 
             _uiState.value = FolderUiState(
                 isLoading = false,
@@ -234,6 +245,30 @@ class FolderViewModel(
             }
             _uiState.value = _uiState.value.copy(moveFolderTargets = null)
             refresh(showLoading = false)
+        }
+    }
+
+    /**
+     * Finalizes a drag: moves the list [fromIndex] → [toIndex] in the visible order and
+     * persists the new preference (the complete set of existing lists in this folder, which
+     * also prunes deleted entries from the order file). On failure the order reverts via a
+     * fresh scan.
+     */
+    fun dropList(fromIndex: Int, toIndex: Int) {
+        val lists = _uiState.value.lists.toMutableList()
+        if (fromIndex !in lists.indices || toIndex !in lists.indices) return
+
+        val list = lists.removeAt(fromIndex)
+        lists.add(toIndex, list)
+        _uiState.value = _uiState.value.copy(lists = lists)
+
+        viewModelScope.launch {
+            val names = lists.map { it.displayName }
+            val result = fileRepository.reorderLists(folderPath, names)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_reorder_failed))
+                refresh(showLoading = false)
+            }
         }
     }
 
@@ -392,7 +427,7 @@ private fun FolderPage(
     val isUnfiled = folder.isUnfiled
     val viewModel: FolderViewModel = viewModel(
         key = "folder_${folder.uri}",
-        factory = FolderViewModelFactory(fileRepository, folder.uri, isUnfiled),
+        factory = FolderViewModelFactory(fileRepository, folder.uri, isUnfiled, folder.displayName),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -758,27 +793,47 @@ private fun FolderPage(
             return@Scaffold
         }
 
+        val listState = rememberLazyListState()
+        val dragState = remember(listState) {
+            DragReorderState(
+                listState = listState,
+                scope = scope,
+                onDrop = { from, to -> viewModel.dropList(from, to) },
+            )
+        }
+
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(bottom = 96.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
         ) {
-            items(
+            itemsIndexed(
                 items = uiState.lists,
-                key = { it.uri.toString() },
-            ) { list ->
-                TodoListRow(
-                    list = list,
-                    onClick = { onOpenList(list.uri) },
-                    onRename = {
-                        renameTarget = list
-                        renameValue = list.displayName
-                    },
-                    onMove = { moveListTarget = list },
-                    onDelete = { deleteTarget = list },
-                )
+                key = { _, list -> list.uri.toString() },
+            ) { _, list ->
+                val rowKey = list.uri.toString()
+                Column(modifier = Modifier.animateItem(
+                    fadeInSpec = tween(180),
+                    placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    fadeOutSpec = tween(160),
+                )) {
+                    DragReorderIndicatorSlot(dragState, rowKey)
+                    TodoListRow(
+                        list = list,
+                        onClick = { onOpenList(list.uri) },
+                        onRename = {
+                            renameTarget = list
+                            renameValue = list.displayName
+                        },
+                        onMove = { moveListTarget = list },
+                        onDelete = { deleteTarget = list },
+                        modifier = Modifier.dragReorderable(dragState, rowKey),
+                    )
+                    DragReorderIndicatorSlot(dragState, rowKey, below = true)
+                }
             }
         }
     }
@@ -791,6 +846,7 @@ private fun TodoListRow(
     onRename: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember(list.uri) { mutableStateOf(false) }
     ListItem(
@@ -851,7 +907,7 @@ private fun TodoListRow(
                 }
             }
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
     )
 }
 
@@ -907,11 +963,12 @@ private class FolderViewModelFactory(
     private val fileRepository: FileRepository,
     private val folderUri: Uri,
     private val isUnfiled: Boolean,
+    private val folderPath: String,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FolderViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FolderViewModel(fileRepository, folderUri, isUnfiled) as T
+            return FolderViewModel(fileRepository, folderUri, isUnfiled, folderPath) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

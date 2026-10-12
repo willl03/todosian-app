@@ -157,6 +157,7 @@
     <string name="error_folder_invalid">Could not access the selected folder.</string>
     <string name="error_read_failed">Could not read the file.</string>
     <string name="error_write_failed">Could not save your changes.</string>
+    <string name="error_reorder_failed">Couldn’t save the new order.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
