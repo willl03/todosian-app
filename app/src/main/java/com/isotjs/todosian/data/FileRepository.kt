@@ -572,9 +572,20 @@ class SafFileRepository(
 
                 val renamed = DocumentsContract.renameDocument(appContext.contentResolver, document.uri, fileName)
                     ?: throw IllegalStateException("Unable to rename document")
-                // Normalize the result back to the parent listing's URI form, so successive
-                // operations (and widget bindings) keep working across providers.
-                val resolved = parent.findFile(fileName)?.uri ?: renamed
+
+                // Some providers serve a stale folder listing right after a rename; retry the
+                // lookup so `resolved` is the tree-based URI. Adopting the bare document URI
+                // returned by renameDocument is what breaks successive renames on those
+                // providers (reads keep working on it, renames don't).
+                var resolved: Uri = renamed
+                for (attempt in 0 until 4) {
+                    val found = parent.findFile(fileName)
+                    if (found != null) {
+                        resolved = found.uri
+                        break
+                    }
+                    if (attempt < 3) delay(150) else Log.w(TAG, "renamed file not visible in parent listing after retries")
+                }
 
                 // Keep the manual order: rename the list's entry in its folder's section, in
                 // place. Best-effort, same trade-off as folder renames.
