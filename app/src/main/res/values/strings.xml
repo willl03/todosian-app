@@ -111,7 +111,7 @@
 
     <string name="category_tasks_metadata_title">Tasks metadata</string>
     <string name="category_tasks_created">➕ Created</string>
-    <string name="category_tasks_due">📅 Due</string>
+    <string name="category_tasks_due">📅 Date</string>
     <string name="category_tasks_start">🛫 Start</string>
     <string name="category_tasks_scheduled">⏳ Scheduled</string>
     <string name="category_tasks_done">✅ Done</string>
@@ -119,7 +119,7 @@
     <string name="category_tasks_recurrence">🔁 Recurrence</string>
 
     <string name="category_tasks_created_label">Created</string>
-    <string name="category_tasks_due_label">Due</string>
+    <string name="category_tasks_due_label">Date</string>
     <string name="category_tasks_start_label">Start</string>
     <string name="category_tasks_scheduled_label">Scheduled</string>
     <string name="category_tasks_done_label">Done</string>
