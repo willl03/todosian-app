@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,6 +52,7 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.ThemeMode
 import com.isotjs.todosian.ui.components.TodosianDimens
@@ -179,6 +182,33 @@ class WidgetConfigureActivity : ComponentActivity() {
     }
 }
 
+/** One row of the widget picker: a folder section header or a bindable list. */
+internal sealed interface PickerRow<out T> {
+    /** [name] is null for the unfiled pseudo-folder (resolved to a localized string in the UI). */
+    data class FolderHeader<T>(val name: String?, val isUnfiled: Boolean = false) : PickerRow<T>
+    data class ListRow<T>(val list: T) : PickerRow<T>
+}
+
+/**
+ * Flat rows for the widget picker that preserve the vault structure: each folder ([name] to
+ * its lists) becomes a section header followed by its lists, and the unfiled section comes
+ * last, only when non-empty — mirroring the main app. Generic so it is unit-testable without
+ * Android framework types (android.net.Uri is not mockable on the JVM).
+ */
+internal fun <T> buildPickerRows(
+    folders: List<Pair<String, List<T>>>,
+    unfiledLists: List<T>,
+): List<PickerRow<T>> = buildList {
+    folders.forEach { (name, lists) ->
+        add(PickerRow.FolderHeader(name = name))
+        lists.forEach { add(PickerRow.ListRow(it)) }
+    }
+    if (unfiledLists.isNotEmpty()) {
+        add(PickerRow.FolderHeader(name = null, isUnfiled = true))
+        unfiledLists.forEach { add(PickerRow.ListRow(it)) }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WidgetConfigureScreen(
@@ -190,14 +220,19 @@ private fun WidgetConfigureScreen(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(fileRepository != null) }
-    var lists by remember { mutableStateOf<List<TodoList>>(emptyList()) }
+    var pickerRows by remember { mutableStateOf<List<PickerRow<TodoList>>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
         if (fileRepository == null) {
             isLoading = false
             return@LaunchedEffect
         }
-        lists = fileRepository.getAllLists(includeCounts = true).getOrDefault(emptyList())
+        val content = fileRepository.getVaultContent(includeCounts = true)
+            .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
+        pickerRows = buildPickerRows<TodoList>(
+            folders = content.folders.map { it.displayName to it.lists },
+            unfiledLists = content.unfiledLists,
+        )
         isLoading = false
     }
 
@@ -226,6 +261,21 @@ private fun WidgetConfigureScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     TodosianLoadingIndicator()
+                }
+            }
+
+            pickerRows.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TodosianEmptyState(
+                        icon = Icons.Outlined.FolderOff,
+                        title = stringResource(R.string.add_task_picker_empty_title),
+                        subtitle = stringResource(R.string.add_task_picker_empty_subtitle),
+                    )
                 }
             }
 
@@ -272,28 +322,60 @@ private fun WidgetConfigureScreen(
                             },
                         )
                     }
-                    items(
-                        items = lists,
-                        key = { it.uri.toString() },
-                    ) { list ->
-                        ListItem(
-                            headlineContent = { Text(text = list.displayName) },
-                            supportingContent = {
-                                Text(text = pluralStringResource(R.plurals.widget_configure_task_count, list.todoCount, list.todoCount))
-                            },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Folder,
-                                    contentDescription = null,
-                                )
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = Color.Transparent,
-                            ),
-                            modifier = Modifier.clickable {
-                                onConfirm(WidgetSelection(list.uri.toString(), list.displayName))
-                            },
-                        )
+                    itemsIndexed(
+                        items = pickerRows,
+                        key = { index, row ->
+                            when (row) {
+                                is PickerRow.FolderHeader ->
+                                    "header_${row.name ?: "unfiled"}"
+                                is PickerRow.ListRow -> row.list.uri.toString()
+                            } + "_$index"
+                        },
+                    ) { _, row ->
+                        when (row) {
+                            is PickerRow.FolderHeader -> ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = if (row.isUnfiled) {
+                                            stringResource(R.string.home_unfiled_title)
+                                        } else {
+                                            row.name.orEmpty()
+                                        },
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Folder,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent,
+                                ),
+                            )
+
+                            is PickerRow.ListRow -> ListItem(
+                                headlineContent = { Text(text = row.list.displayName) },
+                                supportingContent = {
+                                    Text(text = pluralStringResource(R.plurals.widget_configure_task_count, row.list.todoCount, row.list.todoCount))
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Checklist,
+                                        contentDescription = null,
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent,
+                                ),
+                                modifier = Modifier
+                                    .padding(start = 28.dp)
+                                    .clickable {
+                                        onConfirm(WidgetSelection(row.list.uri.toString(), row.list.displayName))
+                                    },
+                            )
+                        }
                     }
                 }
             }
