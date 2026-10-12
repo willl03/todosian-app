@@ -266,9 +266,26 @@ Before submitting your work for review:
 
 1. Module: `:app`
 2. `minSdk`: 30
-3. `targetSdk`: 36
+3. `targetSdk`: 37
 4. Compose UI (Material 3)
 5. Java source/target compatibility is set in Gradle (see `app/build.gradle.kts`).
+
+## Signing Release Builds Locally
+
+1. The Gradle release signing config reads credentials from `keystore.properties` (or `TODOSIAN_RELEASE_*` environment variables). When those are absent, `:app:assembleRelease` produces `app-release-unsigned.apk`.
+2. For local testing, sign the unsigned APK with the Android debug keystore (the same one used by debug builds, so the APK installs over previous locally built releases):
+   ```bash
+   apksigner sign \
+     --ks ~/.android/debug.keystore \
+     --ks-key-alias androiddebugkey \
+     --ks-pass pass:android \
+     --key-pass pass:android \
+     --out app/build/outputs/apk/release/app-release-signed.apk \
+     app/build/outputs/apk/release/app-release-unsigned.apk
+   ```
+3. The `apksigner` binary ships with the Android SDK build tools (use the highest installed version).
+4. Verify the result before handing it off: `apksigner verify --print-certs app/build/outputs/apk/release/app-release-signed.apk`.
+5. Debug-keystore-signed builds are for local testing only. Never publish them (F-Droid/Play builds are signed by their own processes).
 
 ## Questions?
 
