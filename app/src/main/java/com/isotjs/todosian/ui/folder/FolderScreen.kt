@@ -501,6 +501,10 @@ fun FolderScreen(
 
     HorizontalPager(
         state = pagerState,
+        // No horizontal swiping between folders: since folder taps open the folder's lists
+        // directly, the folder view is a single-folder context (e.g. reordering), not a
+        // swipeable gallery. Navigation happens through Home.
+        userScrollEnabled = false,
         key = { pageIndex -> pages.getOrNull(pageIndex)?.uri ?: pageIndex },
         modifier = modifier.fillMaxSize(),
     ) { pageIndex ->
