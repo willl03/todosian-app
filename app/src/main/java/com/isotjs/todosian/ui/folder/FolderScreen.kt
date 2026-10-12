@@ -187,14 +187,16 @@ class FolderViewModel(
         }
     }
 
-    fun createCategory(name: String) {
+    fun createCategory(name: String, onCreated: (Uri?) -> Unit = {}) {
         viewModelScope.launch {
             val created = fileRepository.createCategory(folderUri, name)
             if (created.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
+                onCreated(null)
                 return@launch
             }
             refresh(showLoading = false)
+            onCreated(created.getOrNull())
         }
     }
 
@@ -654,7 +656,14 @@ private fun FolderPage(
                     }
                     TextButton(
                         onClick = {
-                            viewModel.createCategory(newListName)
+                            // An empty folder has no lists yet: jump straight into the first
+                            // one after creating it, instead of staying in the reorder view.
+                            val folderWasEmpty = uiState.lists.isEmpty()
+                            viewModel.createCategory(newListName) { created ->
+                                if (folderWasEmpty && created != null) {
+                                    onOpenList(created)
+                                }
+                            }
                             scope.launch {
                                 newListSheetState.hide()
                                 showNewListSheet = false
