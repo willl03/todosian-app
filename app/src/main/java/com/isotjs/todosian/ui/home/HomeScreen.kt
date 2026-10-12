@@ -521,7 +521,15 @@ fun HomeScreen(
                                     DragReorderIndicatorSlot(dragState, rowKey)
                                     FolderRow(
                                         folder = folder,
-                                        onClick = { onOpenFolder(folder) },
+                                        onClick = {
+                                            NavSeed.seedVault(
+                                                VaultContent(
+                                                    folders = uiState.folders,
+                                                    unfiledLists = uiState.unfiledLists,
+                                                ),
+                                            )
+                                            onOpenFolder(folder)
+                                        },
                                         onRename = {
                                             renameTarget = folder
                                             renameValue = folder.displayName
