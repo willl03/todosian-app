@@ -23,7 +23,6 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
@@ -49,7 +48,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,18 +91,19 @@ import com.isotjs.todosian.ui.components.TodosianSectionHeader
 import com.isotjs.todosian.ui.components.todosianFabShape
 import com.isotjs.todosian.utils.MarkdownParser
 import com.isotjs.todosian.utils.TodoSorter
-import com.isotjs.todosian.utils.leadingEmoji
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.text.KeyboardOptions
 import java.time.LocalDate
 
 /**
- * The full todo UI for a single list: top bar, todo rows, add/edit/move sheets and the FAB.
- * Self-contained so it can be used as a page inside the folder's [HorizontalPager-based]
- * list pager (see [ListPagerScreen]).
+ * The full todo UI for a single section: a compact section bar, todo rows, add/edit/move
+ * sheets and the FAB. Self-contained so it can be used as a page inside the folder's
+ * [HorizontalPager-based] section pager (see [ListPagerScreen]); the fixed folder bar and the
+ * back navigation live one level up, in the pager.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -112,18 +111,13 @@ fun CategoryScreen(
     fileRepository: FileRepository,
     appSettingsRepository: AppSettingsRepository,
     categoryUri: Uri,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     autoOpenAddTodo: Boolean = false,
-    /** 1-based position of this list within its folder (for the pager badge). */
-    listPosition: Int = 1,
-    /** Total lists in this list's folder (for the pager badge). */
-    listCount: Int = 1,
     /** Order-file key of the containing folder: the folder name, "" for unfiled. */
     parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled); null when unknown. */
     parentFolderUri: Uri? = null,
-    /** List name from the pager scan; seeds the title before the file is read. */
+    /** Section name from the pager scan; seeds the title before the file is read. */
     seededTitle: String = "",
 ) {
     val viewModel: CategoryViewModel = viewModel(
@@ -667,102 +661,92 @@ fun CategoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    // The parent folder's leading emoji doubles as its color badge.
-                    val folderEmoji = remember(parentPath) { leadingEmoji(parentPath) }
-                    Text(
-                        text = listOfNotNull(
-                            folderEmoji,
-                            uiState.title.takeIf { it.isNotBlank() },
-                        ).joinToString("  "),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
+            // Compact section bar: moves with the pages; the fixed folder bar (name, folder
+            // menu) lives one level up in the section pager. The back navigation is there too.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(
+                        horizontal = TodosianDimens.ScreenHorizontalPadding,
+                        vertical = 6.dp,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = uiState.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box {
+                    IconButton(onClick = {
+                        menuShowCompleted = settings.showCompleted
+                        listMenuExpanded = true
+                    }) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_navigate_back),
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.cd_overflow_menu),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                },
-                actions = {
-                    Text(
-                        text = stringResource(R.string.page_indicator, listPosition, listCount),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                    Box {
-                        IconButton(onClick = {
-                            menuShowCompleted = settings.showCompleted
-                            listMenuExpanded = true
-                        }) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = stringResource(R.string.cd_overflow_menu),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = listMenuExpanded,
-                            onDismissRequest = { listMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = stringResource(
-                                            if (menuShowCompleted) {
-                                                R.string.list_menu_hide_completed
-                                            } else {
-                                                R.string.list_menu_show_completed
-                                            },
-                                        ),
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = if (menuShowCompleted) {
-                                            Icons.Outlined.VisibilityOff
+                    DropdownMenu(
+                        expanded = listMenuExpanded,
+                        onDismissRequest = { listMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(
+                                        if (menuShowCompleted) {
+                                            R.string.list_menu_hide_completed
                                         } else {
-                                            Icons.Outlined.Visibility
+                                            R.string.list_menu_show_completed
                                         },
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    listMenuExpanded = false
-                                    appSettingsRepository.setShowCompleted(!menuShowCompleted)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(text = stringResource(R.string.folder_list_action_rename)) },
-                                onClick = {
-                                    listMenuExpanded = false
-                                    renameListValue = uiState.title
-                                    showRenameListSheet = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(text = stringResource(R.string.folder_list_action_move)) },
-                                onClick = {
-                                    listMenuExpanded = false
-                                    showMoveListSheet = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(text = stringResource(R.string.folder_list_action_delete)) },
-                                onClick = {
-                                    listMenuExpanded = false
-                                    showDeleteListDialog = true
-                                },
-                            )
-                        }
+                                    ),
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (menuShowCompleted) {
+                                        Icons.Outlined.VisibilityOff
+                                    } else {
+                                        Icons.Outlined.Visibility
+                                    },
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                listMenuExpanded = false
+                                appSettingsRepository.setShowCompleted(!menuShowCompleted)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.folder_list_action_rename)) },
+                            onClick = {
+                                listMenuExpanded = false
+                                renameListValue = uiState.title
+                                showRenameListSheet = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.folder_list_action_move)) },
+                            onClick = {
+                                listMenuExpanded = false
+                                showMoveListSheet = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.folder_list_action_delete)) },
+                            onClick = {
+                                listMenuExpanded = false
+                                showDeleteListDialog = true
+                            },
+                        )
                     }
-                },
-            )
+                }
+            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {

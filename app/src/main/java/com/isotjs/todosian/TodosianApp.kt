@@ -232,6 +232,9 @@ fun TodosianApp(
                     )
                     navController.popBackStack()
                 },
+                onOpenFolderView = { folderUri ->
+                    navController.navigate(Routes.folder(folderUri))
+                },
             )
         }
 
