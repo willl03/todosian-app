@@ -87,7 +87,13 @@ interface FileRepository {
     suspend fun createCategory(parentUri: Uri, name: String): Result<Uri>
 
     /** [parentPath]/[currentName] keep the manual order in sync (order-file entry renamed in place). */
-    suspend fun renameCategory(categoryUri: Uri, parentPath: String, currentName: String, newName: String): Result<Uri>
+    suspend fun renameCategory(
+        parentFolderUri: Uri,
+        categoryUri: Uri,
+        parentPath: String,
+        currentName: String,
+        newName: String,
+    ): Result<Uri>
 
     suspend fun deleteCategory(categoryUri: Uri): Result<Unit>
 
@@ -532,6 +538,7 @@ class SafFileRepository(
     }
 
     override suspend fun renameCategory(
+        parentFolderUri: Uri,
         categoryUri: Uri,
         parentPath: String,
         currentName: String,
@@ -550,8 +557,24 @@ class SafFileRepository(
                     .trim()
                     .let { base -> if (base.endsWith(".md", ignoreCase = true)) base else "$base.md" }
 
-                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, categoryUri, fileName)
-                if (renamed == null) throw IllegalStateException("Unable to rename document")
+                // Resolve the document freshly from its parent folder: a previous rename
+                // makes SAF hand back a bare document URI, which some providers refuse to
+                // rename a second time — the parent listing always carries the current,
+                // tree-based URI.
+                val parent = DocumentFile.fromTreeUri(appContext, parentFolderUri)
+                    ?: throw IllegalStateException("Invalid folder URI")
+                val currentFileName =
+                    if (currentName.endsWith(".md", ignoreCase = true)) currentName else "$currentName.md"
+                val document = parent.findFile(currentFileName)
+                    ?: parent.findFile(currentName)
+                    ?: DocumentFile.fromSingleUri(appContext, categoryUri)
+                    ?: throw IllegalStateException("List not found")
+
+                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, document.uri, fileName)
+                    ?: throw IllegalStateException("Unable to rename document")
+                // Normalize the result back to the parent listing's URI form, so successive
+                // operations (and widget bindings) keep working across providers.
+                val resolved = parent.findFile(fileName)?.uri ?: renamed
 
                 // Keep the manual order: rename the list's entry in its folder's section, in
                 // place. Best-effort, same trade-off as folder renames.
@@ -560,9 +583,11 @@ class SafFileRepository(
                 }
                 // Keep widget bindings pointing at this list: the rename changes the document
                 // URI, exactly like a move does.
-                WidgetRefresher.remapSelection(appContext, oldUri = categoryUri, newUri = renamed)
+                WidgetRefresher.remapSelection(appContext, oldUri = document.uri, newUri = resolved)
                 scheduleWidgetUpdate()
-                renamed
+                resolved
+            }.onFailure { error ->
+                Log.e(TAG, "renameCategory failed (current=$currentName new=$newName)", error)
             }
         }
     }

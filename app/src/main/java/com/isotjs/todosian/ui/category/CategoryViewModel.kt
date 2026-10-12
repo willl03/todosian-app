@@ -171,9 +171,18 @@ class CategoryViewModel(
     fun renameCategory(newName: String) {
         viewModelScope.launch {
             val currentName = _uiState.value.title
-            val result = fileRepository.renameCategory(categoryUri, parentPath, currentName, newName)
+            val result = fileRepository.renameCategory(
+                parentFolderUri = parentFolderUri ?: categoryUri,
+                categoryUri = categoryUri,
+                parentPath = parentPath,
+                currentName = currentName,
+                newName = newName,
+            )
             val newUri = result.getOrNull()
             if (result.isFailure || newUri == null) {
+                // Self-heal: re-read from disk — the rename may have partially succeeded
+                // (e.g. the document was renamed but the order write failed).
+                refreshFromDisk(showLoading = false)
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
             }

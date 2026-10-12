@@ -202,7 +202,13 @@ class FolderViewModel(
 
     fun renameCategory(categoryUri: Uri, currentName: String, newName: String) {
         viewModelScope.launch {
-            val result = fileRepository.renameCategory(categoryUri, folderPath, currentName, newName)
+            val result = fileRepository.renameCategory(
+                parentFolderUri = folderUri,
+                categoryUri = categoryUri,
+                parentPath = folderPath,
+                currentName = currentName,
+                newName = newName,
+            )
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
