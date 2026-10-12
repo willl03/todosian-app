@@ -86,6 +86,8 @@ import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import com.isotjs.todosian.ui.components.dragReorderable
+import com.isotjs.todosian.ui.components.validateFolderName
+import com.isotjs.todosian.ui.components.validateListFileName
 import com.isotjs.todosian.ui.components.todosianFabShape
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -108,13 +110,6 @@ data class FolderUiState(
     val lists: List<TodoList> = emptyList(),
     /** null = not loaded yet; used by the "move list to another folder" sheet. */
     val moveFolderTargets: List<MoveFolderTarget>? = null,
-)
-
-/** A destination folder for moving a whole list. [isUnfiled] marks the vault-root pseudo-folder. */
-data class MoveFolderTarget(
-    val displayName: String,
-    val uri: Uri,
-    val isUnfiled: Boolean = false,
 )
 
 class FolderViewModel(
@@ -548,7 +543,7 @@ private fun FolderPage(
     }
 
     if (renameTarget != null) {
-        val validation = remember(renameValue) { validateListNameForRename(renameValue) }
+        val validation = remember(renameValue) { validateListFileName(renameValue) }
         val errorText = validation.errorMessageResId?.let { stringResource(it) }
         ModalBottomSheet(
             onDismissRequest = {
@@ -605,7 +600,7 @@ private fun FolderPage(
                     TextButton(
                         onClick = {
                             val target = renameTarget
-                            val normalized = validation.normalizedFileName
+                            val normalized = validation.normalizedName
                             if (target != null && normalized != null) {
                                 viewModel.renameList(target.uri, currentName = target.displayName, newName = normalized)
                             }
@@ -615,7 +610,7 @@ private fun FolderPage(
                                 renameValue = ""
                             }
                         },
-                        enabled = validation.normalizedFileName != null,
+                        enabled = validation.normalizedName != null,
                     ) {
                         Text(text = stringResource(R.string.action_save))
                     }
