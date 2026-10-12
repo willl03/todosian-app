@@ -91,6 +91,7 @@ import com.isotjs.todosian.ui.components.TodosianSectionHeader
 import com.isotjs.todosian.ui.components.todosianFabShape
 import com.isotjs.todosian.utils.MarkdownParser
 import com.isotjs.todosian.utils.TodoSorter
+import com.isotjs.todosian.utils.leadingEmoji
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
@@ -662,8 +663,13 @@ fun ListPage(
         topBar = {
             TopAppBar(
                 title = {
+                    // The parent folder's leading emoji doubles as its color badge.
+                    val folderEmoji = remember(parentPath) { leadingEmoji(parentPath) }
                     Text(
-                        text = uiState.title,
+                        text = listOfNotNull(
+                            folderEmoji,
+                            uiState.title.takeIf { it.isNotBlank() },
+                        ).joinToString("  "),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

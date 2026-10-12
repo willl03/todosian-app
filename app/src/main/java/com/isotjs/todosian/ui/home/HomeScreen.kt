@@ -87,6 +87,8 @@ import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
+import com.isotjs.todosian.ui.components.FolderColorPickerSheet
+import com.isotjs.todosian.ui.components.pickedColorToName
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
 import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
@@ -171,6 +173,7 @@ fun HomeScreen(
     var renameTarget by remember { mutableStateOf<Folder?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<Folder?>(null) }
+    var colorTarget by remember { mutableStateOf<Folder?>(null) }
 
     val scope = rememberCoroutineScope()
     val newFolderSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -312,6 +315,18 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    colorTarget?.let { target ->
+        FolderColorPickerSheet(
+            folderName = target.displayName,
+            onPick = { emoji ->
+                val newName = pickedColorToName(target.displayName, emoji)
+                if (newName != null) viewModel.renameFolder(target.uri, newName)
+                colorTarget = null
+            },
+            onDismiss = { colorTarget = null },
+        )
     }
 
     if (deleteTarget != null) {
@@ -534,6 +549,7 @@ fun HomeScreen(
                                             renameTarget = folder
                                             renameValue = folder.displayName
                                         },
+                                        onPickColor = { colorTarget = folder },
                                         onDelete = { deleteTarget = folder },
                                         onMoveUp = folderIndex.takeIf { it > 0 }?.let { from ->
                                             { viewModel.dropFolder(from, from - 1) }
@@ -666,6 +682,7 @@ private fun FolderRow(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    onPickColor: (() -> Unit)? = null,
     /** Null hides the action; non-null moves the row by one position. */
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
@@ -737,6 +754,15 @@ private fun FolderRow(
                                 onRename()
                             },
                         )
+                        if (onPickColor != null) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.home_folder_action_color)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onPickColor()
+                                },
+                            )
+                        }
                         if (onMoveUp != null) {
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(R.string.home_folder_action_move_up)) },

@@ -92,7 +92,9 @@ import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.ListPagerSeed
+import com.isotjs.todosian.ui.components.FolderColorPickerSheet
 import com.isotjs.todosian.ui.components.dragReorderable
+import com.isotjs.todosian.ui.components.pickedColorToName
 import com.isotjs.todosian.ui.components.validateFolderName
 import com.isotjs.todosian.ui.components.validateListFileName
 import com.isotjs.todosian.ui.components.todosianFabShape
@@ -595,6 +597,7 @@ private fun FolderPage(
     var showRenameFolderSheet by remember { mutableStateOf(false) }
     var renameFolderValue by remember { mutableStateOf("") }
     var showDeleteFolderDialog by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
     var folderMenuExpanded by remember(folder.uri) { mutableStateOf(false) }
 
     val newListSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -921,6 +924,18 @@ private fun FolderPage(
         }
     }
 
+    if (showColorPicker) {
+        FolderColorPickerSheet(
+            folderName = uiState.folderName.ifBlank { folder.displayName },
+            onPick = { emoji ->
+                val newName = pickedColorToName(uiState.folderName.ifBlank { folder.displayName }, emoji)
+                if (newName != null) viewModel.renameFolder(newName)
+                showColorPicker = false
+            },
+            onDismiss = { showColorPicker = false },
+        )
+    }
+
     if (showDeleteFolderDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteFolderDialog = false },
@@ -997,6 +1012,13 @@ private fun FolderPage(
                                         folderMenuExpanded = false
                                         renameFolderValue = uiState.folderName
                                         showRenameFolderSheet = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.home_folder_action_color)) },
+                                    onClick = {
+                                        folderMenuExpanded = false
+                                        showColorPicker = true
                                     },
                                 )
                                 DropdownMenuItem(

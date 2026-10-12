@@ -33,6 +33,9 @@
     <string name="home_folder_lists_empty">No lists yet</string>
     <string name="home_folder_action_rename">Rename</string>
     <string name="home_folder_action_delete">Delete</string>
+    <string name="home_folder_action_color">Color</string>
+    <string name="folder_color_title">Folder color</string>
+    <string name="folder_color_none">None</string>
     <string name="home_folder_action_move_up">Move up</string>
     <string name="home_folder_action_move_down">Move down</string>
     <string name="home_rename_folder_title">Rename folder</string>
