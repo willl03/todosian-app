@@ -79,6 +79,7 @@
     <string name="list_unavailable_subtitle">This list was moved or deleted.</string>
     <string name="page_indicator" translatable="false">%1$d/%2$d</string>
     <string name="folder_action_reorder">Reorder sections</string>
+    <string name="folder_action_add_section">Add section</string>
 
     <!-- Category -->
     <string name="category_empty_title">No todos yet</string>

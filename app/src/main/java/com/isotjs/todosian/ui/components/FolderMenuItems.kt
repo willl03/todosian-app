@@ -14,12 +14,22 @@ import com.isotjs.todosian.R
  */
 @Composable
 fun FolderMenuItems(
+    onAddSection: (() -> Unit)? = null,
     onRename: () -> Unit,
     onPickColor: () -> Unit,
     onDelete: () -> Unit,
     onReorder: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
+    onAddSection?.let { addSection ->
+        DropdownMenuItem(
+            text = { Text(text = stringResource(R.string.folder_action_add_section)) },
+            onClick = {
+                onDismiss()
+                addSection()
+            },
+        )
+    }
     onReorder?.let { reorder ->
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.folder_action_reorder)) },

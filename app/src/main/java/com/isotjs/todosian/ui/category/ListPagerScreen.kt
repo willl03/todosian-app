@@ -156,6 +156,8 @@ fun ListPagerScreen(
     var renameFolderValue by remember { mutableStateOf("") }
     var showColorPicker by remember { mutableStateOf(false) }
     var showDeleteFolderDialog by remember { mutableStateOf(false) }
+    var showAddSectionSheet by remember { mutableStateOf(false) }
+    var addSectionName by remember { mutableStateOf("") }
 
     if (uiState.isLoading) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -242,6 +244,7 @@ fun ListPagerScreen(
                                 onDismissRequest = { folderMenuExpanded = false },
                             ) {
                                 FolderMenuItems(
+                                    onAddSection = { showAddSectionSheet = true },
                                     onRename = {
                                         renameFolderValue = uiState.folderName
                                         showRenameFolderSheet = true
@@ -280,6 +283,62 @@ fun ListPagerScreen(
                 seededTitle = page.displayName,
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+    }
+
+    if (showAddSectionSheet) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showAddSectionSheet = false
+                addSectionName = ""
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(bottom = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.folder_new_list_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = addSectionName,
+                    onValueChange = { addSectionName = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(R.string.folder_new_list_hint)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TextButton(
+                        onClick = {
+                            showAddSectionSheet = false
+                            addSectionName = ""
+                        },
+                    ) {
+                        Text(text = stringResource(R.string.action_cancel))
+                    }
+                    TextButton(
+                        onClick = {
+                            pagerViewModel.createSection(addSectionName)
+                            showAddSectionSheet = false
+                            addSectionName = ""
+                        },
+                        enabled = addSectionName.trim().isNotEmpty(),
+                    ) {
+                        Text(text = stringResource(R.string.action_save))
+                    }
+                }
+            }
         }
     }
 
@@ -482,6 +541,24 @@ class ListPagerViewModel(
                 folderName = containingFolder?.displayName ?: "",
                 currentListUri = current?.uri?.toString(),
             )
+        }
+    }
+
+    /** Creates a section in this folder and re-anchors the pager onto it. */
+    fun createSection(name: String, onCreated: (Uri?) -> Unit = {}) {
+        viewModelScope.launch {
+            val folderUri = _uiState.value.parentFolderUri ?: return@launch
+            val created = fileRepository.createCategory(folderUri, name)
+            if (created.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+                onCreated(null)
+                return@launch
+            }
+            // Anchor on the new section so the pager follows it after the refresh.
+            anchorUri = created.getOrNull() ?: anchorUri
+            anchorName = name
+            refresh()
+            onCreated(created.getOrNull())
         }
     }
 
