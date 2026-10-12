@@ -20,8 +20,8 @@ android {
         targetSdk = 37
         // Fork versioning: versionCode = <upstream code> * 1000 + <fork build>;
         // versionName = "<upstream version>+fork.<build>".
-        versionCode = 10001
-        versionName = "2.2.0+fork.1"
+        versionCode = 10002
+        versionName = "2.2.0+fork.2"
     }
 
     val keystoreProperties = Properties().apply {
@@ -117,9 +117,11 @@ tasks.register("updateChangelogJson") {
         val jsonFile = file("src/main/assets/changelog.json")
         if (jsonFile.exists() && vCode != null && vName != null) {
             val content = jsonFile.readText()
+            // Only the newest entry (first in the file) is synced; older entries keep their
+            // own version metadata.
             val updated = content
-                .replace(Regex("\"versionCode\":\\s*\\d+"), "\"versionCode\": $vCode")
-                .replace(Regex("\"versionName\":\\s*\"[^\"]*\""), "\"versionName\": \"$vName\"")
+                .replaceFirst(Regex("\"versionCode\":\\s*\\d+"), "\"versionCode\": $vCode")
+                .replaceFirst(Regex("\"versionName\":\\s*\"[^\"]*\""), "\"versionName\": \"$vName\"")
             if (content != updated) {
                 jsonFile.writeText(updated)
             }
