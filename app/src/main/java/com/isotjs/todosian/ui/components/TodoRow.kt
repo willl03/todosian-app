@@ -58,10 +58,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.isotjs.todosian.R
@@ -161,7 +168,7 @@ fun TodoRow(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = todo.note,
+                            text = noteLinkifiedText(todo.note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
@@ -522,6 +529,44 @@ internal data class TasksMetaChipUi(
     val icon: ImageVector?,
     val color: Color? = null,
 )
+
+/**
+ * The footer note with URLs turned into tappable links (opened in the browser). Links are
+ * typed as plain text in the note field; only the footer display linkifies them.
+ */
+@Composable
+private fun noteLinkifiedText(note: String): AnnotatedString {
+    val uriHandler = LocalUriHandler.current
+    val linkColor = MaterialTheme.colorScheme.primary
+    return buildAnnotatedString {
+        val urlRegex = Regex("""(?:https?://|www\.)\S+""")
+        var index = 0
+        for (match in urlRegex.findAll(note)) {
+            if (match.range.first > index) append(note.substring(index, match.range.first))
+            val shown = match.value
+            // Don't include trailing punctuation in the link target.
+            val trimmed = shown.trimEnd('.', ',', ';', ':', '!', '?', ')')
+            val target = if (trimmed.startsWith("www.")) "https://$trimmed" else trimmed
+            withLink(
+                LinkAnnotation.Clickable(
+                    tag = target,
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline,
+                        )
+                    ),
+                ) {
+                    uriHandler.openUri(target)
+                }
+            ) {
+                append(shown)
+            }
+            index = match.range.last + 1
+        }
+        if (index < note.length) append(note.substring(index))
+    }
+}
 
 @Composable
 internal fun priorityColorFor(priority: TasksPriority?): Color? {
