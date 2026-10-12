@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.VaultContent
+import com.isotjs.todosian.ui.NavSeed
+import com.isotjs.todosian.ui.components.PickerRow
+import com.isotjs.todosian.ui.components.buildPickerRows
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
@@ -46,10 +52,26 @@ fun AddTaskScreen(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(true) }
+    // When set (widget bound to a folder), the picker shows only that folder's lists.
+    val scopedFolderUri = remember { NavSeed.consumeAddTaskFolder() }
+    var scopedFolderName by remember { mutableStateOf<String?>(null) }
     var lists by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var pickerRows by remember { mutableStateOf<List<PickerRow<Category>>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
-        lists = fileRepository.getCategories(includeCounts = false).getOrDefault(emptyList())
+        val content = fileRepository.getVaultContent(includeCounts = false)
+            .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
+        if (scopedFolderUri != null) {
+            val folder = content.folders.firstOrNull { it.uri == scopedFolderUri }
+            scopedFolderName = folder?.displayName
+            lists = folder?.lists.orEmpty()
+        } else {
+            lists = content.allLists()
+            pickerRows = buildPickerRows(
+                folders = content.folders.map { Triple(it.uri.toString(), it.displayName, it.lists) },
+                unfiledLists = content.unfiledLists,
+            )
+        }
         isLoading = false
     }
 
@@ -107,25 +129,64 @@ fun AddTaskScreen(
                             modifier = Modifier.padding(vertical = 12.dp),
                         )
                     }
-                    items(
-                        items = lists,
-                        key = { it.uri.toString() },
-                    ) { list ->
-                        ListItem(
-                            headlineContent = { Text(text = list.displayName) },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Folder,
-                                    contentDescription = null,
-                                )
-                            },
-                            modifier = Modifier.clickable {
-                                onSelectList(list.uri)
-                            },
-                        )
+                    if (scopedFolderUri != null) {
+                        // Folder-bound widget: only that folder's lists, no structure needed.
+                        items(
+                            items = lists,
+                            key = { it.uri.toString() },
+                        ) { list ->
+                            ListRow(list, onSelectList)
+                        }
+                    } else {
+                        // Unbound widget: the full vault structure, folders as headers.
+                        pickerRows.forEach { row ->
+                            when (row) {
+                                is PickerRow.FolderHeader -> item(key = "header_${row.name}") {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(
+                                                text = row.name
+                                                    ?: stringResource(R.string.home_unfiled_title),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                        },
+                                        leadingContent = {
+                                            Icon(
+                                                imageVector = Icons.Filled.Folder,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        },
+                                    )
+                                }
+                                is PickerRow.ListRow -> item(key = row.list.uri.toString()) {
+                                    ListRow(row.list, onSelectList)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ListRow(
+    list: Category,
+    onSelectList: (Uri) -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(text = list.displayName) },
+        leadingContent = {
+            Icon(
+                imageVector = Icons.Outlined.Checklist,
+                contentDescription = null,
+            )
+        },
+        modifier = Modifier.clickable {
+            onSelectList(list.uri)
+        },
+    )
 }

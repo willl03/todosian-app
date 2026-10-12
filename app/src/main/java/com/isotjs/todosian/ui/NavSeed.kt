@@ -21,6 +21,9 @@ object NavSeed {
     /** Folder page → list pager: the containing folder's lists and its folder key. */
     private var listPager: ListPagerSeed? = null
 
+    /** Widget → add-task picker: the folder the picker should be scoped to. */
+    private var addTaskFolder: Uri? = null
+
     fun seedVault(content: VaultContent) {
         vault = content
     }
@@ -49,6 +52,17 @@ object NavSeed {
         val seed = listPager ?: return null
         listPager = null
         return seed.takeIf { seed.lists.any { it.uri == entryListUri } }
+    }
+
+    fun seedAddTaskFolder(folderUri: Uri) {
+        addTaskFolder = folderUri
+    }
+
+    /** Returns the folder a widget-bound add task should be scoped to, clearing the seed. */
+    fun consumeAddTaskFolder(): Uri? {
+        val seed = addTaskFolder
+        addTaskFolder = null
+        return seed
     }
 }
 
