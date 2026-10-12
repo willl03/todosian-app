@@ -9,6 +9,8 @@ import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.ui.components.PickerRow
+import com.isotjs.todosian.ui.components.buildPickerRows
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +30,7 @@ data class ListUiState(
     val activeTodos: List<Todo> = emptyList(),
     val completedTodos: List<Todo> = emptyList(),
     val lines: List<String> = emptyList(),
-    val moveTargets: List<MoveTarget>? = null,
+    val moveTargets: List<PickerRow<MoveTarget>>? = null,
     val isLoadingMoveTargets: Boolean = false,
     /** Folder destinations for moving this whole list; null = not loaded yet. */
     val moveFolderTargets: List<MoveFolderTarget>? = null,
@@ -124,11 +126,29 @@ class CategoryViewModel(
 
         _uiState.value = state.copy(isLoadingMoveTargets = true)
         viewModelScope.launch {
-            val targets = fileRepository.getCategories(includeCounts = false)
-                .getOrElse { emptyList() }
-                .filterNot { it.uri == categoryUri }
-                .map { MoveTarget(title = it.displayName, uri = it.uri) }
-                .sortedBy { it.title.lowercase() }
+            val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
+            val targets = if (content == null) {
+                emptyList()
+            } else {
+                val rows = buildPickerRows(
+                    folders = content.folders.map { folder ->
+                        folder.displayName to folder.lists
+                            .filterNot { it.uri == categoryUri }
+                            .map { MoveTarget(title = it.displayName, uri = it.uri) }
+                    },
+                    unfiledLists = content.unfiledLists
+                        .filterNot { it.uri == categoryUri }
+                        .map { MoveTarget(title = it.displayName, uri = it.uri) },
+                )
+                // Folder headers whose entries were all filtered out (e.g. a folder holding
+                // only the section the todo is moved from) would render as empty groups.
+                rows.filterIndexed { index, row ->
+                    when (row) {
+                        is PickerRow.ListRow -> true
+                        is PickerRow.FolderHeader -> rows.getOrNull(index + 1) is PickerRow.ListRow
+                    }
+                }
+            }
 
             _uiState.value = _uiState.value.copy(
                 moveTargets = targets,

@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -81,6 +82,7 @@ import com.isotjs.todosian.data.settings.NewTodoFilePosition
 import com.isotjs.todosian.data.settings.TodoGrouping
 import com.isotjs.todosian.data.settings.TodoSort
 import com.isotjs.todosian.ui.components.TasksMetaEditor
+import com.isotjs.todosian.ui.components.PickerRow
 import com.isotjs.todosian.ui.components.TodoRow
 import com.isotjs.todosian.ui.components.validateListFileName
 import com.isotjs.todosian.ui.components.TodoSheetMode
@@ -418,25 +420,18 @@ fun CategoryScreen(
                     }
 
                     else -> {
-                        targets.forEach { target ->
-                            ListItem(
-                                headlineContent = { Text(text = target.title) },
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Folder,
-                                        contentDescription = null,
-                                    )
-                                },
-                                modifier = Modifier.clickable {
-                                    val todo = moveTodoTarget
-                                    if (todo != null) {
-                                        viewModel.moveTodo(todo, target.uri)
-                                    }
-                                    moveTodoTarget = null
-                                    showCopyOption = false
-                                },
-                            )
-                        }
+                        MoveTargetRows(
+                            rows = targets,
+                            leading = Icons.Outlined.Checklist,
+                            onPick = { target ->
+                                val todo = moveTodoTarget
+                                if (todo != null) {
+                                    viewModel.moveTodo(todo, target.uri)
+                                }
+                                moveTodoTarget = null
+                                showCopyOption = false
+                            },
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                         TextButton(onClick = { showCopyOption = !showCopyOption }) {
                             Text(
@@ -450,25 +445,18 @@ fun CategoryScreen(
 
                         if (showCopyOption) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            targets.forEach { target ->
-                                ListItem(
-                                    headlineContent = { Text(text = target.title) },
-                                    leadingContent = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.ContentCopy,
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    modifier = Modifier.clickable {
-                                        val todo = moveTodoTarget
-                                        if (todo != null) {
-                                            viewModel.copyTodo(todo, target.uri)
-                                        }
-                                        moveTodoTarget = null
-                                        showCopyOption = false
-                                    },
-                                )
-                            }
+                            MoveTargetRows(
+                                rows = targets,
+                                leading = Icons.Outlined.ContentCopy,
+                                onPick = { target ->
+                                    val todo = moveTodoTarget
+                                    if (todo != null) {
+                                        viewModel.copyTodo(todo, target.uri)
+                                    }
+                                    moveTodoTarget = null
+                                    showCopyOption = false
+                                },
+                            )
                         }
                     }
                 }
@@ -964,6 +952,41 @@ fun CategoryScreen(
             }
 
             item { Spacer(modifier = Modifier.height(96.dp)) }
+        }
+    }
+}
+
+/**
+ * The move/copy target list with folder structure: folder headers (non-clickable) followed by
+ * their sections, unfiled sections last. [leading] distinguishes move from copy rows.
+ */
+@Composable
+private fun MoveTargetRows(
+    rows: List<PickerRow<MoveTarget>>,
+    leading: ImageVector,
+    onPick: (MoveTarget) -> Unit,
+) {
+    rows.forEach { row ->
+        when (row) {
+            is PickerRow.FolderHeader -> ListItem(
+                headlineContent = {
+                    Text(
+                        text = row.name ?: stringResource(R.string.home_unfiled_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                leadingContent = {
+                    Icon(imageVector = Icons.Outlined.Folder, contentDescription = null)
+                },
+            )
+            is PickerRow.ListRow -> ListItem(
+                headlineContent = { Text(text = row.list.title) },
+                leadingContent = {
+                    Icon(imageVector = leading, contentDescription = null)
+                },
+                modifier = Modifier.clickable { onPick(row.list) },
+            )
         }
     }
 }

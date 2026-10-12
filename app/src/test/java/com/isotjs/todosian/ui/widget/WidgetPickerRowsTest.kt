@@ -1,5 +1,7 @@
 package com.isotjs.todosian.ui.widget
 
+import com.isotjs.todosian.ui.components.PickerRow
+import com.isotjs.todosian.ui.components.buildPickerRows
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
