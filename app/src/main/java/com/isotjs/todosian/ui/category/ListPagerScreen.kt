@@ -482,6 +482,9 @@ class ListPagerViewModel(
     private var anchorUri: Uri = categoryUri
     private var anchorName: String? = null
 
+    /** Guards `refresh()`: only the most recently started scan may apply its result. */
+    private var scanGeneration = 0L
+
     init {
         observeVaultChanges()
         // Instant first frame: the sending screen knows this folder's lists; the scan below
@@ -515,9 +518,18 @@ class ListPagerViewModel(
         }
     }
 
+    /**
+     * Re-scans the vault and re-anchors. Multiple refreshes can be in flight at once
+     * (rename events, the debounced file observer); a generation counter makes the
+     * last-STARTED scan the only one allowed to apply its result — a slower, stale scan
+     * must never overwrite fresher state (stale pages would re-key a page onto a URI that
+     * no longer exists, breaking the visible section until the next rescan).
+     */
     fun refresh() {
+        val generation = ++scanGeneration
         viewModelScope.launch {
             val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
+            if (generation != scanGeneration) return@launch
             // Find the folder holding the anchored section: by URI, then by display name
             // (a folder rename changes every child URI; the name is what stays stable).
             var containingFolder = content?.folders?.firstOrNull { folder ->

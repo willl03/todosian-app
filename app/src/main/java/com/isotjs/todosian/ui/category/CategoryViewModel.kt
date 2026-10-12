@@ -99,7 +99,10 @@ class CategoryViewModel(
             val linesResult = fileRepository.readLines(categoryUri)
             if (linesResult.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
-                _uiState.value = _uiState.value.copy(isLoading = false, title = title)
+                // Keep the last known title: a failed read must not blank the header (the
+                // stale read typically follows a rename whose rescan is already re-keying
+                // this page onto the renamed document).
+                _uiState.value = _uiState.value.copy(isLoading = false)
                 return@launch
             }
 
