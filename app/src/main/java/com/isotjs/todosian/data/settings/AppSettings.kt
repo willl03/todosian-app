@@ -5,6 +5,7 @@ data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val showDailyFocus: Boolean = true,
     val dailyFocusMode: DailyFocusMode = DailyFocusMode.TODAY,
+    val showCompleted: Boolean = true,
     val todoGrouping: TodoGrouping = TodoGrouping.GROUPED,
     val todoSort: TodoSort = TodoSort.FILE_ORDER,
     val newTodoFilePosition: NewTodoFilePosition = NewTodoFilePosition.BOTTOM,

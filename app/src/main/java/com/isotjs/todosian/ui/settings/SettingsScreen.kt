@@ -463,6 +463,16 @@ fun SettingsScreen(
 
                         SettingsSwitchRow(
                             icon = Icons.Filled.Info,
+                            title = stringResource(R.string.settings_show_completed),
+                            subtitle = stringResource(R.string.settings_show_completed_subtitle),
+                            checked = settings.showCompleted,
+                            onCheckedChange = { appSettingsRepository.setShowCompleted(it) },
+                        )
+
+                        SettingsDivider()
+
+                        SettingsSwitchRow(
+                            icon = Icons.Filled.Info,
                             title = stringResource(R.string.settings_enable_tasks_plugin_support),
                             subtitle = stringResource(R.string.settings_enable_tasks_plugin_support_subtitle),
                             checked = settings.enableTasksPluginSupport,

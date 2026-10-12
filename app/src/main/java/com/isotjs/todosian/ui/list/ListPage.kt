@@ -769,7 +769,9 @@ fun ListPage(
             return@Scaffold
         }
 
-        val anyTodos = uiState.activeTodos.isNotEmpty() || uiState.completedTodos.isNotEmpty()
+        // Hidden completed tasks do not count towards the "is anything visible" check.
+        val anyTodos = uiState.activeTodos.isNotEmpty() ||
+            (settings.showCompleted && uiState.completedTodos.isNotEmpty())
         if (!anyTodos) {
             TodosianEmptyState(
                 icon = Icons.Outlined.Checklist,
@@ -785,11 +787,19 @@ fun ListPage(
         val sortedActiveTodos = remember(uiState.activeTodos, settings.todoSort) {
             TodoSorter.sort(uiState.activeTodos, settings.todoSort)
         }
-        val sortedCompletedTodos = remember(uiState.completedTodos, settings.todoSort) {
-            TodoSorter.sort(uiState.completedTodos, settings.todoSort)
+        val sortedCompletedTodos = remember(uiState.completedTodos, settings.todoSort, settings.showCompleted) {
+            if (settings.showCompleted) TodoSorter.sort(uiState.completedTodos, settings.todoSort) else emptyList()
         }
-        val sortedAllTodos = remember(uiState.activeTodos, uiState.completedTodos, settings.todoSort) {
-            TodoSorter.sort(uiState.activeTodos + uiState.completedTodos, settings.todoSort)
+        val sortedAllTodos = remember(
+            uiState.activeTodos,
+            uiState.completedTodos,
+            settings.todoSort,
+            settings.showCompleted,
+        ) {
+            TodoSorter.sort(
+                uiState.activeTodos + uiState.completedTodos.filter { settings.showCompleted || !it.isDone },
+                settings.todoSort,
+            )
         }
 
         LazyColumn(

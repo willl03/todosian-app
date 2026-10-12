@@ -15,6 +15,7 @@ interface AppSettingsRepository {
     fun setDynamicColorEnabled(enabled: Boolean)
 
     fun setShowDailyFocus(enabled: Boolean)
+    fun setShowCompleted(enabled: Boolean)
     fun setDailyFocusMode(mode: DailyFocusMode)
     fun setTodoGrouping(grouping: TodoGrouping)
     fun setTodoSort(sort: TodoSort)
@@ -62,6 +63,10 @@ class SharedPrefsAppSettingsRepository(
 
     override fun setShowDailyFocus(enabled: Boolean) {
         prefs.edit { putBoolean(KEY_SHOW_DAILY_FOCUS, enabled) }
+    }
+
+    override fun setShowCompleted(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_SHOW_COMPLETED, enabled) }
     }
 
     override fun setDailyFocusMode(mode: DailyFocusMode) {
@@ -120,6 +125,7 @@ class SharedPrefsAppSettingsRepository(
             themeMode = themeMode,
             dynamicColorEnabled = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
             showDailyFocus = prefs.getBoolean(KEY_SHOW_DAILY_FOCUS, true),
+            showCompleted = prefs.getBoolean(KEY_SHOW_COMPLETED, true),
             dailyFocusMode = prefs.getString(KEY_DAILY_FOCUS_MODE, null)?.let { raw ->
                 runCatching { DailyFocusMode.valueOf(raw) }.getOrNull()
             } ?: DailyFocusMode.TODAY,
@@ -140,6 +146,7 @@ class SharedPrefsAppSettingsRepository(
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_SHOW_DAILY_FOCUS = "show_daily_focus"
+        private const val KEY_SHOW_COMPLETED = "show_completed_lists"
         private const val KEY_DAILY_FOCUS_MODE = "daily_focus_mode"
         private const val KEY_TODO_GROUPING = "todo_grouping"
         private const val KEY_TODO_SORT = "todo_sort"
