@@ -30,6 +30,8 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -177,6 +179,9 @@ fun ListPage(
     var showCopyOption by remember { mutableStateOf(false) }
 
     var listMenuExpanded by remember { mutableStateOf(false) }
+    // Frozen when the menu opens so the toggle item keeps its label/icon while the menu
+    // collapses; the real setting updates on click and is re-read the next time it opens.
+    var menuShowCompleted by remember { mutableStateOf(true) }
     var showRenameListSheet by remember { mutableStateOf(false) }
     var renameListValue by remember { mutableStateOf("") }
     var showDeleteListDialog by remember { mutableStateOf(false) }
@@ -690,7 +695,10 @@ fun ListPage(
                         modifier = Modifier.padding(end = 8.dp),
                     )
                     Box {
-                        IconButton(onClick = { listMenuExpanded = true }) {
+                        IconButton(onClick = {
+                            menuShowCompleted = settings.showCompleted
+                            listMenuExpanded = true
+                        }) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
                                 contentDescription = stringResource(R.string.cd_overflow_menu),
@@ -701,6 +709,33 @@ fun ListPage(
                             expanded = listMenuExpanded,
                             onDismissRequest = { listMenuExpanded = false },
                         ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(
+                                            if (menuShowCompleted) {
+                                                R.string.list_menu_hide_completed
+                                            } else {
+                                                R.string.list_menu_show_completed
+                                            },
+                                        ),
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (menuShowCompleted) {
+                                            Icons.Outlined.VisibilityOff
+                                        } else {
+                                            Icons.Outlined.Visibility
+                                        },
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    listMenuExpanded = false
+                                    appSettingsRepository.setShowCompleted(!menuShowCompleted)
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(R.string.folder_list_action_rename)) },
                                 onClick = {

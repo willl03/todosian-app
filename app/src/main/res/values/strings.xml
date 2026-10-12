@@ -57,6 +57,8 @@
     <string name="folder_delete_list_title">Delete list?</string>
     <string name="folder_delete_list_body">This will delete the markdown file from your folder.</string>
     <string name="folder_delete_list_confirm">Delete</string>
+    <string name="list_menu_show_completed">Show completed tasks</string>
+    <string name="list_menu_hide_completed">Hide completed tasks</string>
     <string name="folder_list_action_rename">Rename</string>
     <string name="folder_list_action_move">Move to another folder</string>
     <string name="folder_list_action_delete">Delete</string>
