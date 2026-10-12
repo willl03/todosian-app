@@ -33,6 +33,8 @@
     <string name="home_folder_lists_empty">No lists yet</string>
     <string name="home_folder_action_rename">Rename</string>
     <string name="home_folder_action_delete">Delete</string>
+    <string name="home_folder_action_move_up">Move up</string>
+    <string name="home_folder_action_move_down">Move down</string>
     <string name="home_rename_folder_title">Rename folder</string>
     <string name="home_rename_folder_hint">New name</string>
     <string name="home_rename_folder_error_empty">Name can’t be empty.</string>
@@ -55,6 +57,8 @@
     <string name="folder_list_action_rename">Rename</string>
     <string name="folder_list_action_move">Move to another folder</string>
     <string name="folder_list_action_delete">Delete</string>
+    <string name="folder_list_action_move_up">Move up</string>
+    <string name="folder_list_action_move_down">Move down</string>
     <string name="folder_move_list_title">Move list</string>
     <string name="folder_move_list_body">Choose a folder to move this list to.</string>
     <string name="folder_move_list_empty">No other folders available.</string>

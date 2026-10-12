@@ -491,7 +491,7 @@ fun HomeScreen(
                             itemsIndexed(
                                 items = uiState.folders,
                                 key = { _, folder -> folder.uri.toString() },
-                            ) { _, folder ->
+                            ) { folderIndex, folder ->
                                 val rowKey = folder.uri.toString()
                                 Column(modifier = Modifier.animateItem(
                                     fadeInSpec = tween(durationMillis = 180),
@@ -508,6 +508,12 @@ fun HomeScreen(
                                         },
                                         onDelete = { deleteTarget = folder },
                                         modifier = Modifier.dragReorderable(dragState, rowKey),
+                                        onMoveUp = folderIndex.takeIf { it > 0 }?.let { from ->
+                                            { viewModel.dropFolder(from, from - 1) }
+                                        },
+                                        onMoveDown = folderIndex.takeIf { it < uiState.folders.lastIndex }?.let { from ->
+                                            { viewModel.dropFolder(from, from + 1) }
+                                        },
                                     )
                                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                                 }
@@ -631,6 +637,9 @@ private fun FolderRow(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Null hides the action; non-null moves the row by one position. */
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember(folder.uri) { mutableStateOf(false) }
     Card(
@@ -699,6 +708,24 @@ private fun FolderRow(
                                 onRename()
                             },
                         )
+                        if (onMoveUp != null) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.home_folder_action_move_up)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveUp()
+                                },
+                            )
+                        }
+                        if (onMoveDown != null) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.home_folder_action_move_down)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveDown()
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.home_folder_action_delete)) },
                             onClick = {

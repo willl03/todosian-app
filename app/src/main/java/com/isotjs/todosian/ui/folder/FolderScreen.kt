@@ -27,6 +27,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Delete
@@ -829,7 +831,7 @@ private fun FolderPage(
             itemsIndexed(
                 items = uiState.lists,
                 key = { _, list -> list.uri.toString() },
-            ) { _, list ->
+            ) { listIndex, list ->
                 val rowKey = list.uri.toString()
                 Column(modifier = Modifier.animateItem(
                     fadeInSpec = tween(180),
@@ -847,6 +849,12 @@ private fun FolderPage(
                         onMove = { moveListTarget = list },
                         onDelete = { deleteTarget = list },
                         modifier = Modifier.dragReorderable(dragState, rowKey),
+                        onMoveUp = listIndex.takeIf { it > 0 }?.let { from ->
+                            { viewModel.dropList(from, from - 1) }
+                        },
+                        onMoveDown = listIndex.takeIf { it < uiState.lists.lastIndex }?.let { from ->
+                            { viewModel.dropList(from, from + 1) }
+                        },
                     )
                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                 }
@@ -863,6 +871,9 @@ private fun TodoListRow(
     onMove: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Null hides the action; non-null moves the row by one position. */
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember(list.uri) { mutableStateOf(false) }
     ListItem(
@@ -904,6 +915,26 @@ private fun TodoListRow(
                             onRename()
                         },
                     )
+                    if (onMoveUp != null) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.folder_list_action_move_up)) },
+                            leadingIcon = { Icon(imageVector = Icons.Filled.KeyboardArrowUp, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onMoveUp()
+                            },
+                        )
+                    }
+                    if (onMoveDown != null) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.folder_list_action_move_down)) },
+                            leadingIcon = { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onMoveDown()
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(text = stringResource(R.string.folder_list_action_move)) },
                         leadingIcon = { Icon(imageVector = Icons.Outlined.DriveFileMove, contentDescription = null) },
