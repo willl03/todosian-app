@@ -25,11 +25,13 @@ class WidgetSnapshotTest {
         categoryUri: String = "content://category",
         categoryName: String = "Inbox",
         priorityLabel: String? = null,
+        isSectionStart: Boolean = false,
     ) = WidgetTaskItem(
         categoryUri = categoryUri,
         listName = categoryName,
         todo = todo(text, isDone, lineIndex, dueDate),
         priorityLabel = priorityLabel,
+        isSectionStart = isSectionStart,
     )
 
     @Test
@@ -42,6 +44,24 @@ class WidgetSnapshotTest {
                 item("Due task", lineIndex = 7, dueDate = "2026-10-12", priorityLabel = "🔺"),
                 item("Done task", isDone = true, lineIndex = 1),
             ),
+        )
+
+        val restored = WidgetSnapshot.fromPreferences(snapshot.toPreferences())
+
+        assertEquals(snapshot, restored)
+    }
+
+    @Test
+    fun `round trip preserves folder-bound snapshots with section starts`() {
+        val snapshot = WidgetSnapshot(
+            hasFolder = true,
+            activeCount = 2,
+            items = listOf(
+                item("First list task", categoryName = "One", isSectionStart = true),
+                item("Second list task", categoryName = "Two", isSectionStart = true),
+            ),
+            title = "🔴 Folder",
+            isFolderBound = true,
         )
 
         val restored = WidgetSnapshot.fromPreferences(snapshot.toPreferences())
@@ -319,5 +339,41 @@ class WidgetSnapshotTest {
     fun `filter of empty list stays empty regardless of the flag`() {
         assertEquals(emptyList<WidgetTaskItem>(), filterCompletedItems(emptyList(), showCompleted = false))
         assertEquals(emptyList<WidgetTaskItem>(), filterCompletedItems(emptyList(), showCompleted = true))
+    }
+
+    private fun selection(
+        folderUri: String?,
+        folderName: String?,
+    ) = WidgetSelection(
+        categoryUri = null,
+        categoryName = null,
+        folderUri = folderUri,
+        folderName = folderName,
+    )
+
+    @Test
+    fun `folder binding resolves by uri`() {
+        val folders = listOf("content://a" to "🔴 A", "content://b" to "🔵 B")
+        assertEquals("content://b", resolveFolderKey(folders, selection("content://b", "Wrong name")))
+    }
+
+    @Test
+    fun `folder binding falls back to the stored name`() {
+        val folders = listOf("content://a" to "🔴 A", "content://b" to "🔵 B")
+        assertEquals("content://b", resolveFolderKey(folders, selection("content://stale", "🔵 B")))
+    }
+
+    @Test
+    fun `folder binding without a match resolves to null`() {
+        val folders = listOf("content://a" to "🔴 A")
+        assertEquals(null, resolveFolderKey(folders, selection("content://x", "Missing")))
+        assertEquals(null, resolveFolderKey(folders, selection("content://x", null)))
+    }
+
+    @Test
+    fun `non folder bindings resolve to no folder`() {
+        val folders = listOf("content://a" to "🔴 A")
+        assertEquals(null, resolveFolderKey(folders, WidgetSelection.ALL))
+        assertEquals(null, resolveFolderKey(folders, WidgetSelection("content://a", "A")))
     }
 }

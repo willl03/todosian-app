@@ -19,8 +19,10 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
+import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.model.TasksPriority
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.utils.MarkdownParser
@@ -33,6 +35,9 @@ internal val KEY_WIDGET_ACTIVE_COUNT = intPreferencesKey("widget_active_count")
 internal val KEY_WIDGET_ITEM_COUNT = intPreferencesKey("widget_item_count")
 internal val KEY_SELECTED_CATEGORY_URI = stringPreferencesKey("selected_category_uri")
 internal val KEY_SELECTED_CATEGORY_NAME = stringPreferencesKey("selected_category_name")
+internal val KEY_SELECTED_FOLDER_URI = stringPreferencesKey("selected_folder_uri")
+internal val KEY_SELECTED_FOLDER_NAME = stringPreferencesKey("selected_folder_name")
+internal val KEY_IS_FOLDER_BOUND = booleanPreferencesKey("widget_is_folder_bound")
 internal val KEY_SHOW_COMPLETED = booleanPreferencesKey("show_completed")
 private const val ITEM_KEY_PREFIX = "widget_item_"
 
@@ -70,28 +75,39 @@ internal fun filterCompletedItems(
 ): List<WidgetTaskItem> = if (showCompleted) items else items.filter { !it.todo.isDone }
 
 /**
- * Which list a widget instance is bound to. Null [categoryUri] means "All lists" (the unbound,
- * backward-compatible mode). [categoryName] is stored alongside the URI so a stale URI (the list
- * was renamed, which changes its document URI) can still be resolved by display name.
+ * What a widget instance is bound to: a single list ([categoryUri]), a whole folder
+ * ([folderUri]), or nothing ("All lists"). Names are stored alongside the URIs so a stale URI
+ * (a rename changes the document URI) can still be resolved by display name.
  */
 internal data class WidgetSelection(
     val categoryUri: String?,
     val categoryName: String?,
+    val folderUri: String? = null,
+    val folderName: String? = null,
 ) {
-    val isAllLists: Boolean get() = categoryUri == null
+    val isAllLists: Boolean get() = categoryUri == null && folderUri == null
+    val isFolderBound: Boolean get() = folderUri != null
 
     fun writeTo(prefs: MutablePreferences) {
         if (categoryUri != null) prefs[KEY_SELECTED_CATEGORY_URI] = categoryUri
         else prefs.remove(KEY_SELECTED_CATEGORY_URI)
         if (categoryName != null) prefs[KEY_SELECTED_CATEGORY_NAME] = categoryName
         else prefs.remove(KEY_SELECTED_CATEGORY_NAME)
+        if (folderUri != null) prefs[KEY_SELECTED_FOLDER_URI] = folderUri
+        else prefs.remove(KEY_SELECTED_FOLDER_URI)
+        if (folderName != null) prefs[KEY_SELECTED_FOLDER_NAME] = folderName
+        else prefs.remove(KEY_SELECTED_FOLDER_NAME)
     }
 
     companion object {
         val ALL = WidgetSelection(null, null)
 
-        fun from(prefs: Preferences): WidgetSelection =
-            WidgetSelection(prefs[KEY_SELECTED_CATEGORY_URI], prefs[KEY_SELECTED_CATEGORY_NAME])
+        fun from(prefs: Preferences): WidgetSelection = WidgetSelection(
+            categoryUri = prefs[KEY_SELECTED_CATEGORY_URI],
+            categoryName = prefs[KEY_SELECTED_CATEGORY_NAME],
+            folderUri = prefs[KEY_SELECTED_FOLDER_URI],
+            folderName = prefs[KEY_SELECTED_FOLDER_NAME],
+        )
     }
 }
 
@@ -120,7 +136,7 @@ internal fun resolveSelectedCategory(
     categories: List<Category>,
     selection: WidgetSelection,
 ): Category? {
-    if (selection.isAllLists) return null
+    if (selection.isAllLists || selection.isFolderBound) return null
     val resolvedKey = resolveCategoryKey(
         categoryKeys = categories.map { it.uri.toString() to it.displayName },
         selection = selection,
@@ -129,14 +145,41 @@ internal fun resolveSelectedCategory(
 }
 
 /**
+ * Pure core of the folder-binding resolution, mirroring [resolveCategoryKey]: matches the
+ * selected folder by URI first, then by stored display name. Returns the matched folder URI
+ * string, or null when the selection is not folder-bound or the folder no longer exists.
+ */
+internal fun resolveFolderKey(
+    folderKeys: List<Pair<String, String>>,
+    selection: WidgetSelection,
+): String? {
+    if (!selection.isFolderBound) return null
+    folderKeys.firstOrNull { it.first == selection.folderUri }?.let { return it.first }
+    val name = selection.folderName?.takeIf { it.isNotBlank() } ?: return null
+    return folderKeys.firstOrNull { it.second.equals(name, ignoreCase = true) }?.first
+}
+
+/** Resolves a folder-bound selection against the current vault content (URI, then name). */
+internal fun resolveSelectedFolder(content: VaultContent, selection: WidgetSelection): Folder? {
+    if (!selection.isFolderBound) return null
+    val folderKey = resolveFolderKey(
+        folderKeys = content.folders.map { it.uri.toString() to it.displayName },
+        selection = selection,
+    ) ?: return null
+    return content.folders.first { it.uri.toString() == folderKey }
+}
+
+/**
  * Snapshot of one widget instance's content, stored in that widget's Glance state (Preferences
  * DataStore). The widget composition renders exclusively from this snapshot; it never reads the
  * Markdown files itself. This makes every refresh a single, atomic recomposition: Glance reliably
  * pushes new state into a live session, and a new session reads the state that was just written.
  *
- * [title] is the bound list's display name, or null for "All lists". [selectedCategoryUri] lets
- * the widget route its "+" action straight into that list. [missingList] marks a selection whose
- * list no longer exists (renamed or deleted).
+ * [title] is the bound list's or folder's display name, or null for "All lists".
+ * [selectedCategoryUri] lets the widget route its "+" action straight into that list.
+ * [missingList] marks a selection whose list no longer exists (renamed or deleted).
+ * [isFolderBound] marks folder bindings, whose items carry [WidgetTaskItem.isSectionStart]
+ * markers so the body can render one small header per list.
  */
 internal data class WidgetSnapshot(
     val hasFolder: Boolean,
@@ -145,6 +188,7 @@ internal data class WidgetSnapshot(
     val title: String? = null,
     val selectedCategoryUri: String? = null,
     val missingList: Boolean = false,
+    val isFolderBound: Boolean = false,
 ) {
     /**
      * Writes all snapshot keys into [prefs], first removing the item keys of any previous
@@ -163,6 +207,7 @@ internal data class WidgetSnapshot(
             prefs.remove(stringPreferencesKey("${prefix}is_done"))
             prefs.remove(stringPreferencesKey("${prefix}due_date"))
             prefs.remove(stringPreferencesKey("${prefix}priority_label"))
+            prefs.remove(booleanPreferencesKey("${prefix}is_section_start"))
         }
 
         prefs[KEY_WIDGET_HAS_FOLDER] = hasFolder
@@ -172,6 +217,7 @@ internal data class WidgetSnapshot(
         if (selectedCategoryUri != null) prefs[SELECTED_URI_KEY] = selectedCategoryUri
         else prefs.remove(SELECTED_URI_KEY)
         prefs[MISSING_LIST_KEY] = missingList
+        prefs[KEY_IS_FOLDER_BOUND] = isFolderBound
         items.forEachIndexed { index, item ->
             val prefix = "$ITEM_KEY_PREFIX$index."
             prefs[stringPreferencesKey("${prefix}category_uri")] = item.categoryUri
@@ -181,6 +227,7 @@ internal data class WidgetSnapshot(
             prefs[booleanPreferencesKey("${prefix}is_done")] = item.todo.isDone
             item.todo.dueDate?.let { prefs[stringPreferencesKey("${prefix}due_date")] = it }
             item.priorityLabel?.let { prefs[stringPreferencesKey("${prefix}priority_label")] = it }
+            if (item.isSectionStart) prefs[booleanPreferencesKey("${prefix}is_section_start")] = true
         }
     }
 
@@ -208,6 +255,7 @@ internal data class WidgetSnapshot(
                         categoryUri = categoryUri,
                         listName = prefs[stringPreferencesKey("${prefix}category_name")] ?: "",
                         priorityLabel = prefs[stringPreferencesKey("${prefix}priority_label")],
+                        isSectionStart = prefs[booleanPreferencesKey("${prefix}is_section_start")] ?: false,
                         todo = Todo(
                             // `id` is a per-parse random UUID and is not part of the snapshot.
                             id = "",
@@ -226,6 +274,7 @@ internal data class WidgetSnapshot(
                 title = prefs[TITLE_KEY],
                 selectedCategoryUri = prefs[SELECTED_URI_KEY],
                 missingList = prefs[MISSING_LIST_KEY] ?: false,
+                isFolderBound = prefs[KEY_IS_FOLDER_BOUND] ?: false,
             )
         }
     }
@@ -269,7 +318,9 @@ object WidgetRefresher {
         refreshMutex.withLock {
             val settings = app.appSettingsRepository.settings.first()
             val priorityLabels = priorityLabels(context, settings.tasksPluginUseEmojisInUi)
-            val categories = fileRepository.getCategories(includeCounts = true).getOrDefault(emptyList())
+            val content = fileRepository.getVaultContent(includeCounts = false)
+                .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
+            val categories = content.allLists()
             val widgetStates = glanceIds.map { glanceId ->
                 runCatching {
                     getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
@@ -285,7 +336,13 @@ object WidgetRefresher {
             val neededUris = buildList {
                 if (selections.any { it.isAllLists }) categories.forEach { add(it.uri) }
                 selections.forEach { selection ->
-                    resolveSelectedCategory(categories, selection)?.let { add(it.uri) }
+                    if (selection.isFolderBound) {
+                        resolveSelectedFolder(content, selection)?.let { folder ->
+                            folder.lists.forEach { add(it.uri) }
+                        }
+                    } else {
+                        resolveSelectedCategory(categories, selection)?.let { add(it.uri) }
+                    }
                 }
             }.toSet()
             val linesByUri = neededUris.associateWith { uri ->
@@ -296,7 +353,7 @@ object WidgetRefresher {
             for ((index, glanceId) in glanceIds.withIndex()) {
                 val snapshot = buildSnapshot(
                     hasFolder = hasFolder,
-                    categories = categories,
+                    content = content,
                     linesByUri = linesByUri,
                     selection = selections[index],
                     showCompleted = showCompletedFlags[index],
@@ -356,18 +413,50 @@ object WidgetRefresher {
     }
 
     /**
-     * Builds the snapshot for one widget instance. For "All lists" the items are aggregated across
-     * every list (active first, then completed), capped at [MAX_TASKS]; for a bound list only that
-     * list's tasks are used.
+     * Builds the snapshot for one widget instance. Three binding modes: "All lists" (items
+     * aggregated across every list), a bound list (only that list's tasks), and a bound folder
+     * (the folder's lists in order, each introduced by a section-start marker so the body can
+     * render a small header). Active tasks come first, then completed; capped at [MAX_TASKS].
      */
     private fun buildSnapshot(
         hasFolder: Boolean,
-        categories: List<Category>,
+        content: VaultContent,
         linesByUri: Map<Uri, List<String>>,
         selection: WidgetSelection,
         showCompleted: Boolean,
         priorityLabels: Map<TasksPriority, String>,
     ): WidgetSnapshot {
+        val categories = content.allLists()
+
+        if (selection.isFolderBound) {
+            val resolvedFolder = resolveSelectedFolder(content, selection)
+            if (resolvedFolder == null) {
+                // The bound folder was renamed or deleted; keep the title so the user knows
+                // which selection to redo, and surface a recoverable state instead of an
+                // empty list.
+                Log.d(TAG, "Folder selection not found: uri=${selection.folderUri}")
+                return WidgetSnapshot(
+                    hasFolder = true,
+                    activeCount = 0,
+                    items = emptyList(),
+                    title = selection.folderName ?: "",
+                    selectedCategoryUri = null,
+                    missingList = true,
+                    isFolderBound = true,
+                )
+            }
+            return snapshotFor(
+                hasFolder = hasFolder,
+                scopedCategories = resolvedFolder.lists,
+                linesByUri = linesByUri,
+                title = resolvedFolder.displayName,
+                selectedCategoryUri = null,
+                isFolderBound = true,
+                showCompleted = showCompleted,
+                priorityLabels = priorityLabels,
+            )
+        }
+
         val resolved = resolveSelectedCategory(categories, selection)
 
         if (selection.categoryUri != null && resolved == null) {
@@ -385,6 +474,33 @@ object WidgetRefresher {
         }
 
         val scopedCategories = if (resolved != null) listOf(resolved) else categories
+        return snapshotFor(
+            hasFolder = hasFolder,
+            scopedCategories = scopedCategories,
+            linesByUri = linesByUri,
+            title = resolved?.displayName,
+            selectedCategoryUri = resolved?.uri?.toString(),
+            isFolderBound = false,
+            showCompleted = showCompleted,
+            priorityLabels = priorityLabels,
+        )
+    }
+
+    /**
+     * Aggregates [scopedCategories]' tasks into one snapshot. In folder-bound mode the first
+     * visible task of each list is marked with [WidgetTaskItem.isSectionStart] (marks are
+     * applied after the completed-filter, so lists with nothing visible lose their header).
+     */
+    private fun snapshotFor(
+        hasFolder: Boolean,
+        scopedCategories: List<Category>,
+        linesByUri: Map<Uri, List<String>>,
+        title: String?,
+        selectedCategoryUri: String?,
+        isFolderBound: Boolean,
+        showCompleted: Boolean,
+        priorityLabels: Map<TasksPriority, String>,
+    ): WidgetSnapshot {
         val taskItems = scopedCategories.flatMap { category ->
             val lines = linesByUri[category.uri].orEmpty()
             MarkdownParser.parse(lines).map { todo ->
@@ -398,19 +514,32 @@ object WidgetRefresher {
         }
         val activeTasks = taskItems.filter { !it.todo.isDone }
         val completedTasks = taskItems.filter { it.todo.isDone }
+        val visible = filterCompletedItems(activeTasks + completedTasks, showCompleted)
+
+        val marked = if (!isFolderBound) {
+            visible
+        } else {
+            var previousCategoryUri: String? = null
+            visible.map { item ->
+                val isSectionStart = item.categoryUri != previousCategoryUri
+                previousCategoryUri = item.categoryUri
+                if (isSectionStart) item.copy(isSectionStart = true) else item
+            }
+        }
+
         Log.d(
             TAG,
-            "loadSnapshot: allLists=${resolved == null} tasks=${taskItems.size} " +
-                "active=${activeTasks.size} completed=${completedTasks.size}",
+            "loadSnapshot: allLists=${title == null && !isFolderBound} folderBound=$isFolderBound " +
+                "tasks=${taskItems.size} active=${activeTasks.size} completed=${completedTasks.size}",
         )
         return WidgetSnapshot(
             hasFolder = hasFolder,
             activeCount = activeTasks.size,
-            items = filterCompletedItems(activeTasks + completedTasks, showCompleted)
-                .take(MAX_TASKS),
-            title = resolved?.displayName,
-            selectedCategoryUri = resolved?.uri?.toString(),
+            items = marked.take(MAX_TASKS),
+            title = title,
+            selectedCategoryUri = selectedCategoryUri,
             missingList = false,
+            isFolderBound = isFolderBound,
         )
     }
 }

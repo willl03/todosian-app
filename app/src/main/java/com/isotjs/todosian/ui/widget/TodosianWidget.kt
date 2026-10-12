@@ -49,6 +49,8 @@ data class WidgetTaskItem(
     val todo: Todo,
     /** Pre-rendered priority label (emoji token or word), null when the task has none. */
     val priorityLabel: String? = null,
+    /** Folder-bound widgets: true on the first visible task of each list (drives its header). */
+    val isSectionStart: Boolean = false,
 )
 
 class TodosianWidget : GlanceAppWidget() {
@@ -76,6 +78,7 @@ class TodosianWidget : GlanceAppWidget() {
                     title = snapshot?.title,
                     selectedCategoryUri = snapshot?.selectedCategoryUri,
                     missingList = snapshot?.missingList ?: false,
+                    isFolderBound = snapshot?.isFolderBound ?: false,
                 )
             }
         }
@@ -89,6 +92,7 @@ class TodosianWidget : GlanceAppWidget() {
         title: String?,
         selectedCategoryUri: String?,
         missingList: Boolean,
+        isFolderBound: Boolean,
     ) {
         val context = LocalContext.current
         val openAppAction = actionStartActivity(
@@ -230,7 +234,28 @@ class TodosianWidget : GlanceAppWidget() {
                         items = items,
                         itemId = { item -> (item.categoryUri + ":" + item.todo.lineIndex + ":" + item.todo.text + ":" + item.todo.isDone).hashCode().toLong() },
                     ) { item ->
-                        TaskRow(item, showSourceList = selectedCategoryUri == null)
+                        Column {
+                            // Folder-bound widgets introduce each list with a small header.
+                            if (isFolderBound && item.isSectionStart) {
+                                Text(
+                                    text = item.listName,
+                                    style = TextStyle(
+                                        color = GlanceTheme.colors.primary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    maxLines = 1,
+                                    modifier = GlanceModifier.padding(top = 6.dp),
+                                )
+                            }
+                            TaskRow(
+                                item,
+                                // The list name is already on the section headers in folder
+                                // mode, and on the widget header for list-bound widgets; only
+                                // the unbound "All lists" mode needs it on every row.
+                                showSourceList = selectedCategoryUri == null && !isFolderBound,
+                            )
+                        }
                     }
                 }
             }
