@@ -120,6 +120,8 @@ fun ListPage(
     parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled); null when unknown. */
     parentFolderUri: Uri? = null,
+    /** List name from the pager scan; seeds the title before the file is read. */
+    seededTitle: String = "",
 ) {
     val viewModel: ListViewModel = viewModel(
         key = "list_$listUri",
@@ -128,6 +130,7 @@ fun ListPage(
             listUri = listUri,
             parentPath = parentPath,
             parentFolderUri = parentFolderUri,
+            seededTitle = seededTitle,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -137,7 +140,7 @@ fun ListPage(
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, viewModel) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.refreshFromDisk(showLoading = false)
+            viewModel.refreshFromDisk(showLoading = false, skipIfFresh = true)
         }
     }
 
@@ -1023,11 +1026,12 @@ class ListViewModelFactory(
     private val listUri: Uri,
     private val parentPath: String = "",
     private val parentFolderUri: Uri? = null,
+    private val seededTitle: String = "",
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ListViewModel(fileRepository, listUri, parentPath, parentFolderUri) as T
+            return ListViewModel(fileRepository, listUri, parentPath, parentFolderUri, seededTitle) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

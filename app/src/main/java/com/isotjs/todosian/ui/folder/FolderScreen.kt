@@ -112,6 +112,8 @@ data class FolderUiState(
     val isLoading: Boolean = true,
     val folderName: String = "",
     val lists: List<TodoList> = emptyList(),
+    /** True until the first count pass completes; rows show a placeholder instead of x/y. */
+    val countsPending: Boolean = false,
     /** null = not loaded yet; used by the "move list to another folder" sheet. */
     val moveFolderTargets: List<MoveFolderTarget>? = null,
 )
@@ -122,45 +124,61 @@ class FolderViewModel(
     val isUnfiled: Boolean,
     /** Order-file key for this folder's lists: the folder name, "" for unfiled. */
     private val folderPath: String,
+    /**
+     * The folder's lists as scanned by the pager (names + order, no counts). Seeding them lets
+     * the page render its rows instantly; the counts fill in with the first refresh.
+     */
+    private val seededLists: List<TodoList> = emptyList(),
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(FolderUiState())
+    private val _uiState = MutableStateFlow(
+        FolderUiState(
+            isLoading = false,
+            folderName = folderPath,
+            lists = seededLists,
+            countsPending = true,
+        ),
+    )
     val uiState: StateFlow<FolderUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<Event>()
     val events = _events.asSharedFlow()
 
+    private var lastScanAtMs = 0L
+
     init {
-        refresh()
+        viewModelScope.launch { doRefresh(showLoading = false) }
     }
 
-    fun refresh(showLoading: Boolean = true) {
-        viewModelScope.launch { doRefresh(showLoading) }
+    fun refresh(showLoading: Boolean = true, skipIfFresh: Boolean = false) {
+        viewModelScope.launch { doRefresh(showLoading, skipIfFresh) }
     }
 
     /** Awaitable refresh for pull-to-refresh: completes when the re-scan is done. */
     suspend fun refreshNow(showLoading: Boolean = false) = doRefresh(showLoading)
 
-    private suspend fun doRefresh(showLoading: Boolean) {
-        run {
-            if (showLoading) {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-            }
+    private suspend fun doRefresh(showLoading: Boolean, skipIfFresh: Boolean = false) {
+        if (skipIfFresh && System.currentTimeMillis() - lastScanAtMs < RESCAN_MIN_INTERVAL_MS) return
+        lastScanAtMs = System.currentTimeMillis()
 
-            val folderName = if (isUnfiled) "" else {
-                fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
-            }
-            val listsResult = fileRepository.getListsIn(folderUri, folderPath, includeCounts = true)
+        if (showLoading) {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+        }
 
-            _uiState.value = FolderUiState(
-                isLoading = false,
-                folderName = folderName,
-                lists = listsResult.getOrDefault(_uiState.value.lists),
-                moveFolderTargets = _uiState.value.moveFolderTargets,
-            )
-            if (listsResult.isFailure) {
-                _events.emit(Event.ShowMessage(R.string.error_read_failed))
-            }
+        val folderName = if (isUnfiled) "" else {
+            fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
+        }
+        val listsResult = fileRepository.getListsIn(folderUri, folderPath, includeCounts = true)
+
+        _uiState.value = FolderUiState(
+            isLoading = false,
+            folderName = folderName,
+            lists = listsResult.getOrDefault(_uiState.value.lists),
+            countsPending = listsResult.isFailure,
+            moveFolderTargets = _uiState.value.moveFolderTargets,
+        )
+        if (listsResult.isFailure) {
+            _events.emit(Event.ShowMessage(R.string.error_read_failed))
         }
     }
 
@@ -293,6 +311,11 @@ class FolderViewModel(
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
         data object FolderRenamed : Event
         data object FolderDeleted : Event
+    }
+
+    private companion object {
+        /** A STARTED re-scan this soon after the previous one is skipped. */
+        private const val RESCAN_MIN_INTERVAL_MS = 2_000L
     }
 }
 
@@ -492,14 +515,20 @@ private fun FolderPage(
     val isUnfiled = folder.isUnfiled
     val viewModel: FolderViewModel = viewModel(
         key = "folder_${folder.uri}",
-        factory = FolderViewModelFactory(fileRepository, folder.uri, isUnfiled, folder.displayName),
+        factory = FolderViewModelFactory(
+            fileRepository = fileRepository,
+            folderUri = folder.uri,
+            isUnfiled = isUnfiled,
+            folderPath = folder.displayName,
+            seededLists = folder.lists,
+        ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, viewModel) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.refresh(showLoading = false)
+            viewModel.refresh(showLoading = false, skipIfFresh = true)
         }
     }
 
@@ -1050,6 +1079,7 @@ private fun FolderPage(
                     TodoListRow(
                         list = list,
                         onClick = { onOpenList(list.uri) },
+                        countsPending = uiState.countsPending,
                         onRename = {
                             renameTarget = list
                             renameValue = list.displayName
@@ -1082,6 +1112,7 @@ private fun TodoListRow(
     onMove: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    countsPending: Boolean = false,
     /** Null hides the action; non-null moves the row by one position. */
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
@@ -1096,7 +1127,13 @@ private fun TodoListRow(
             )
         },
         supportingContent = {
-            Text(text = "${list.doneCount}/${list.todoCount}")
+            Text(
+                text = if (countsPending) {
+                    stringResource(R.string.folder_list_counts_placeholder)
+                } else {
+                    "${list.doneCount}/${list.todoCount}"
+                },
+            )
         },
         leadingContent = {
             Icon(
@@ -1222,11 +1259,12 @@ private class FolderViewModelFactory(
     private val folderUri: Uri,
     private val isUnfiled: Boolean,
     private val folderPath: String,
+    private val seededLists: List<TodoList>,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FolderViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FolderViewModel(fileRepository, folderUri, isUnfiled, folderPath) as T
+            return FolderViewModel(fileRepository, folderUri, isUnfiled, folderPath, seededLists) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

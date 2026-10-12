@@ -46,9 +46,11 @@ class ListViewModel(
     private val parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled); the move source. */
     private val parentFolderUri: Uri? = null,
+    /** List name from the pager scan; seeds the title before the file is read. */
+    private val seededTitle: String = "",
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ListUiState(isLoading = true))
+    private val _uiState = MutableStateFlow(ListUiState(isLoading = true, title = seededTitle))
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<Event>()
@@ -56,6 +58,7 @@ class ListViewModel(
 
     private val inFlightWrites = AtomicInteger(0)
     private val pendingRefreshFromObserver = AtomicBoolean(false)
+    private var lastScanAtMs = 0L
 
     init {
         observeExternalChanges()
@@ -80,7 +83,9 @@ class ListViewModel(
         }
     }
 
-    fun refreshFromDisk(showLoading: Boolean = false) {
+    fun refreshFromDisk(showLoading: Boolean = false, skipIfFresh: Boolean = false) {
+        if (skipIfFresh && System.currentTimeMillis() - lastScanAtMs < RESCAN_MIN_INTERVAL_MS) return
+        lastScanAtMs = System.currentTimeMillis()
         viewModelScope.launch {
             if (showLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
@@ -438,5 +443,10 @@ class ListViewModel(
 
     sealed interface Event {
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
+    }
+
+    private companion object {
+        /** A STARTED re-read this soon after the previous one is skipped. */
+        private const val RESCAN_MIN_INTERVAL_MS = 2_000L
     }
 }

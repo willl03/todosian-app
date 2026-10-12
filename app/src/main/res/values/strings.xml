@@ -57,6 +57,7 @@
     <string name="folder_list_action_rename">Rename</string>
     <string name="folder_list_action_move">Move to another folder</string>
     <string name="folder_list_action_delete">Delete</string>
+    <string name="folder_list_counts_placeholder">…</string>
     <string name="folder_list_action_move_up">Move up</string>
     <string name="folder_list_action_move_down">Move down</string>
     <string name="folder_move_list_title">Move list</string>

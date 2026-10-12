@@ -140,6 +140,7 @@ fun ListPagerScreen(
             listCount = pages.size,
             parentPath = uiState.parentPath,
             parentFolderUri = uiState.parentFolderUri,
+            seededTitle = page.displayName,
             modifier = Modifier.fillMaxSize(),
         )
     }
