@@ -1,12 +1,20 @@
 <h1 align="center">Todosian</h1>
 
 <p align="center">
-  <a href="https://github.com/isotjs/todosian-app/releases/latest"><img src="https://img.shields.io/github/v/release/isotjs/todosian-app?label=release&color=6A40F9" alt="Release"></a>
+  <a href="https://github.com/willl03/todosian-app/releases"><img src="https://img.shields.io/badge/release-2.2.0%2Bfork.1-6A40F9" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-5030C0" alt="License"></a>
-  <a href="https://github.com/isotjs/todosian-app/releases"><img src="https://img.shields.io/github/downloads/isotjs/todosian-app/total?color=8B5CF6" alt="Downloads"></a>
 </p>
 
-> **✨ This is my personal fork** of [isotjs/todosian-app](https://github.com/isotjs/todosian-app), with extra features on top: folders that group your lists (with emoji badges, colors, and manual drag-and-drop ordering), a swipeable list pager, folder-aware widgets, and more. Versions are marked as `upstream+fork.N` (for example `2.2.0+fork.1`). Everything below this notice is the upstream readme.
+> **This is my personal fork** of [isotjs/todosian-app](https://github.com/isotjs/todosian-app). Versions are marked as `upstream+fork.N` (for example `2.2.0+fork.1`). Main features added on top of upstream:
+>
+> - **Folders** – group your lists into folders with emoji badges, colors, and manual drag-and-drop ordering
+> - **List pager** – swipe between the lists of a folder
+> - **Folder-aware widgets** – the picker mirrors your folder structure, task rows show their priority, and a widget bound to one list doesn't repeat its name under every entry
+> - **Show or hide completed tasks** – quick toggle in every list's menu
+> - **Due date + priority sorting** – tasks ordered by due date, ties broken by priority
+> - **Polished details** – new entries start with a capital letter
+>
+> Everything below this notice is the upstream readme.
 
 Todosian is an Android app for managing todo lists stored as Markdown files inside your Obsidian vault.
 
