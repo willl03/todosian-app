@@ -817,6 +817,7 @@ private fun FolderPage(
                 listState = listState,
                 scope = scope,
                 onDrop = { from, to -> viewModel.dropList(from, to) },
+                reorderableCount = { uiState.lists.size },
             )
         }
 
@@ -848,13 +849,13 @@ private fun FolderPage(
                         },
                         onMove = { moveListTarget = list },
                         onDelete = { deleteTarget = list },
-                        modifier = Modifier.dragReorderable(dragState, rowKey),
                         onMoveUp = listIndex.takeIf { it > 0 }?.let { from ->
                             { viewModel.dropList(from, from - 1) }
                         },
                         onMoveDown = listIndex.takeIf { it < uiState.lists.lastIndex }?.let { from ->
                             { viewModel.dropList(from, from + 1) }
                         },
+                        modifier = Modifier.dragReorderable(dragState, rowKey, MaterialTheme.shapes.extraLarge),
                     )
                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                 }

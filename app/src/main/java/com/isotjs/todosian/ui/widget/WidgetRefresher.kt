@@ -41,8 +41,8 @@ internal fun filterCompletedItems(
 ): List<WidgetTaskItem> = if (showCompleted) items else items.filter { !it.todo.isDone }
 
 /**
- * Which note a widget instance is bound to. Null [categoryUri] means "All lists" (the unbound,
- * backward-compatible mode). [categoryName] is stored alongside the URI so a stale URI (the note
+ * Which list a widget instance is bound to. Null [categoryUri] means "All lists" (the unbound,
+ * backward-compatible mode). [categoryName] is stored alongside the URI so a stale URI (the list
  * was renamed, which changes its document URI) can still be resolved by display name.
  */
 internal data class WidgetSelection(
@@ -70,7 +70,7 @@ internal data class WidgetSelection(
  * Pure core of the selection resolution, over (uri string, display name) pairs so it can be unit
  * tested without Android framework classes. Matches by URI first and falls back to the stored
  * display name (e.g. when the document URI changed). Returns the matched URI string, or null for
- * the "All lists" selection, or when the selected note no longer exists.
+ * the "All lists" selection, or when the selected list no longer exists.
  */
 internal fun resolveCategoryKey(
     categoryKeys: List<Pair<String, String>>,
@@ -85,7 +85,7 @@ internal fun resolveCategoryKey(
 /**
  * Resolves a widget's selection against the current category list. Matches by URI first and falls
  * back to the stored display name (e.g. when the document URI changed). Returns null for the
- * "All lists" selection, or when the selected note no longer exists.
+ * "All lists" selection, or when the selected list no longer exists.
  */
 internal fun resolveSelectedList(
     categories: List<TodoList>,
@@ -105,9 +105,9 @@ internal fun resolveSelectedList(
  * Markdown files itself. This makes every refresh a single, atomic recomposition: Glance reliably
  * pushes new state into a live session, and a new session reads the state that was just written.
  *
- * [title] is the bound note's display name, or null for "All lists". [selectedCategoryUri] lets
- * the widget route its "+" action straight into that note. [missingList] marks a selection whose
- * note no longer exists (renamed or deleted).
+ * [title] is the bound list's display name, or null for "All lists". [selectedCategoryUri] lets
+ * the widget route its "+" action straight into that list. [missingList] marks a selection whose
+ * list no longer exists (renamed or deleted).
  */
 internal data class WidgetSnapshot(
     val hasFolder: Boolean,
@@ -204,8 +204,8 @@ internal data class WidgetSnapshot(
  * After any change (a write from the app UI, a checkbox toggle in the widget, a manual refresh),
  * this re-reads the task list from the Markdown files (which remain the single source of truth),
  * stores a per-widget [WidgetSnapshot] in each placed widget's Glance state, and pushes an update
- * to all of them. Each widget shows only its bound note (see [WidgetSelection]); widgets without a
- * selection show all notes, matching the pre-selection behavior.
+ * to all of them. Each widget shows only its bound list (see [WidgetSelection]); widgets without a
+ * selection show all lists, matching the pre-selection behavior.
  */
 object WidgetRefresher {
     private const val TAG = "WidgetRefresher"
@@ -321,8 +321,8 @@ object WidgetRefresher {
 
     /**
      * Builds the snapshot for one widget instance. For "All lists" the items are aggregated across
-     * every note (active first, then completed), capped at [MAX_TASKS]; for a bound note only that
-     * note's tasks are used.
+     * every list (active first, then completed), capped at [MAX_TASKS]; for a bound list only that
+     * list's tasks are used.
      */
     private fun buildSnapshot(
         hasFolder: Boolean,
@@ -334,7 +334,7 @@ object WidgetRefresher {
         val resolved = resolveSelectedList(categories, selection)
 
         if (selection.categoryUri != null && resolved == null) {
-            // The bound note was renamed or deleted; keep the title so the user knows which
+            // The bound list was renamed or deleted; keep the title so the user knows which
             // selection to redo, and surface a recoverable state instead of an empty list.
             Log.d(TAG, "Selection not found: uri=${selection.categoryUri}")
             return WidgetSnapshot(

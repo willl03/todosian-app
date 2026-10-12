@@ -410,6 +410,7 @@ fun HomeScreen(
                 // Only real folders are drop targets; the fixed unfiled pseudo-row is not.
                 onDrop = { from, to -> viewModel.dropFolder(from, to) },
                 canTarget = { key -> key != vaultRootUri.toString() },
+                reorderableCount = { uiState.folders.size },
             )
         }
 
@@ -507,13 +508,13 @@ fun HomeScreen(
                                             renameValue = folder.displayName
                                         },
                                         onDelete = { deleteTarget = folder },
-                                        modifier = Modifier.dragReorderable(dragState, rowKey),
                                         onMoveUp = folderIndex.takeIf { it > 0 }?.let { from ->
                                             { viewModel.dropFolder(from, from - 1) }
                                         },
                                         onMoveDown = folderIndex.takeIf { it < uiState.folders.lastIndex }?.let { from ->
                                             { viewModel.dropFolder(from, from + 1) }
                                         },
+                                        modifier = Modifier.dragReorderable(dragState, rowKey, MaterialTheme.shapes.extraLarge),
                                     )
                                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                                 }

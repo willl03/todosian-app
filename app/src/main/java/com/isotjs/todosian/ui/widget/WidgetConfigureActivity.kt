@@ -60,7 +60,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Configuration screen shown when the user places (or long-press → Edit reconfigures) the
- * Todosian widget. Lets them bind the widget instance to a single note, or keep it showing all
+ * Todosian widget. Lets them bind the widget instance to a single list, or keep it showing all
  * notes. The selection is persisted into that widget instance's Glance state.
  */
 class WidgetConfigureActivity : ComponentActivity() {

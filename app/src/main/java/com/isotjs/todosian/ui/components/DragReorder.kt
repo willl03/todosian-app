@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,9 @@ class DragReorderState(
     private val onDrop: (fromIndex: Int, toIndex: Int) -> Unit,
     /** Which row keys may serve as drop targets (e.g. exclude a fixed pseudo-row). */
     private val canTarget: (Any) -> Boolean = { true },
+    /** Current number of reorderable rows; keeps the insertion index valid when the dragged
+     *  row's slot scrolls out of sight during autoscroll. */
+    private val reorderableCount: () -> Int = { Int.MAX_VALUE },
 ) {
     /** Key of the row currently being dragged, or null. Drives the row's lifted look. */
     var draggingKey: Any? by mutableStateOf(null)
@@ -116,7 +120,18 @@ class DragReorderState(
         dragOffsetPx += deltaPx
 
         val layout = listState.layoutInfo
-        val dragged = layout.visibleItemsInfo.firstOrNull { it.key == key } ?: return
+        val dragged = layout.visibleItemsInfo.firstOrNull { it.key == key }
+        if (dragged == null) {
+            // The row's slot scrolled out of sight during autoscroll: the finger is pinned at
+            // the edge, so clamp the insertion position to that end of the list instead of
+            // acting on a stale index.
+            val count = reorderableCount()
+            if (count > 0) {
+                insertionIndex = if (pendingScrollPx > 0f) count - 1 else 0
+                updateIndicator(layout)
+            }
+            return
+        }
         val dragCenter = dragged.offset + dragOffsetPx + dragged.size / 2f
 
         // Insertion position: how many target rows have their center above the finger's
@@ -154,18 +169,17 @@ class DragReorderState(
     private fun updateIndicator(layout: LazyListLayoutInfo) {
         if (draggingKey == null) return
 
-        // The insertion happens at index [insertionIndex] of the list *without* the dragged
-        // row. In the visual (unmoved) layout that gap sits above the row at full index
-        // [insertionIndex] when dragging upward, and above [insertionIndex + 1] when dragging
-        // downward; past the end of the list it belongs below the last row.
-        val dragged = layout.visibleItemsInfo.firstOrNull { it.key == draggingKey }
         val rowCount = layout.totalItemsCount
-        if (dragged == null || rowCount == 0) {
+        if (rowCount == 0 || insertionIndex < 0) {
             lineAboveKey = null
             lineBelowKey = null
             return
         }
 
+        // The insertion happens at index [insertionIndex] of the list *without* the dragged
+        // row. In the visual (unmoved) layout that gap sits above the row at full index
+        // [insertionIndex] when dragging upward, and above [insertionIndex + 1] when dragging
+        // downward; past the end of the list it belongs below the last row.
         val aboveFull = if (insertionIndex < originalIndex) insertionIndex else insertionIndex + 1
         if (aboveFull >= rowCount) {
             lineAboveKey = null
@@ -233,8 +247,13 @@ fun DragReorderIndicatorSlot(
     }
 }
 
-/** Long-press drag behavior for one row; pairs with [DragReorderIndicatorSlot] wrappers. */
-fun Modifier.dragReorderable(state: DragReorderState, itemKey: Any): Modifier {
+/** Long-press drag behavior for one row; pairs with [DragReorderIndicatorSlot] wrappers.
+ *  [dragShape] shapes the elevation shadow while the row is lifted (match the row shape). */
+fun Modifier.dragReorderable(
+    state: DragReorderState,
+    itemKey: Any,
+    dragShape: Shape? = null,
+): Modifier {
     val isDragging = state.draggingKey == itemKey
     return this
         .zIndex(if (isDragging) 1f else 0f)
@@ -243,6 +262,7 @@ fun Modifier.dragReorderable(state: DragReorderState, itemKey: Any): Modifier {
                 translationY = state.dragOffsetPx
                 scaleX = 1.02f
                 scaleY = 1.02f
+                if (dragShape != null) shape = dragShape
                 shadowElevation = 16f
             }
         }
@@ -264,7 +284,8 @@ fun rememberDragReorderState(
     listState: LazyListState,
     onDrop: (fromIndex: Int, toIndex: Int) -> Unit,
     canTarget: (Any) -> Boolean = { true },
+    reorderableCount: () -> Int = { Int.MAX_VALUE },
 ): DragReorderState {
     val scope = rememberCoroutineScope()
-    return remember(listState) { DragReorderState(listState, scope, onDrop, canTarget) }
+    return remember(listState) { DragReorderState(listState, scope, onDrop, canTarget, reorderableCount) }
 }
