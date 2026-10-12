@@ -86,6 +86,7 @@ import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.ui.NavSeed
+import com.isotjs.todosian.ui.ListPagerSeed
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
 import com.isotjs.todosian.ui.components.FolderColorPickerSheet
 import com.isotjs.todosian.ui.components.pickedColorToName
@@ -113,6 +114,7 @@ fun HomeScreen(
     appSettingsRepository: AppSettingsRepository,
     preferencesManager: PreferencesManager,
     onOpenFolder: (Folder) -> Unit,
+    onOpenList: (Uri) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenDailyFocus: () -> Unit,
     refreshSignal: Long,
@@ -537,13 +539,29 @@ fun HomeScreen(
                                     FolderRow(
                                         folder = folder,
                                         onClick = {
-                                            NavSeed.seedVault(
-                                                VaultContent(
-                                                    folders = uiState.folders,
-                                                    unfiledLists = uiState.unfiledLists,
-                                                ),
-                                            )
-                                            onOpenFolder(folder)
+                                            val firstList = folder.lists.firstOrNull()
+                                            if (firstList == null) {
+                                                // Empty folder: open the folder view (its lists
+                                                // and the new-section FAB) instead of a pager.
+                                                NavSeed.seedVault(
+                                                    VaultContent(
+                                                        folders = uiState.folders,
+                                                        unfiledLists = uiState.unfiledLists,
+                                                    ),
+                                                )
+                                                onOpenFolder(folder)
+                                            } else {
+                                                // Straight into the folder's sections; the pager
+                                                // starts on the first one.
+                                                NavSeed.seedListPager(
+                                                    ListPagerSeed(
+                                                        parentPath = folder.displayName,
+                                                        parentFolderUri = folder.uri,
+                                                        lists = folder.lists,
+                                                    ),
+                                                )
+                                                onOpenList(firstList.uri)
+                                            }
                                         },
                                         onRename = {
                                             renameTarget = folder

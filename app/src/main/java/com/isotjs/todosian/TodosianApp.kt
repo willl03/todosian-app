@@ -135,6 +135,9 @@ fun TodosianApp(
                 onOpenFolder = { folder ->
                     navController.navigate(Routes.folder(folder.uri, folder.isUnfiled))
                 },
+                onOpenList = { categoryUri ->
+                    navController.navigate(Routes.category(categoryUri))
+                },
                 onOpenSettings = {
                     navController.navigate(Routes.Settings)
                 },
