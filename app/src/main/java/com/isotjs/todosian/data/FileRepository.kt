@@ -412,6 +412,10 @@ class SafFileRepository(
 
                 val created = root.createDirectory(cleaned)
                     ?: throw IllegalStateException("Unable to create folder")
+
+                // New folders go to the bottom of the home screen instead of falling back
+                // to A–Z positioning.
+                writeOrder { it.withFolderOrder(it.folders + cleaned) }
                 created.uri
             }
         }
@@ -489,6 +493,23 @@ class SafFileRepository(
                 val fileName = if (cleaned.endsWith(".md", ignoreCase = true)) cleaned else "$cleaned.md"
                 val created = parent.createFile("text/markdown", fileName)
                     ?: throw IllegalStateException("Unable to create file")
+
+                // New sections go to the bottom of their folder's list instead of falling
+                // back to A–Z positioning.
+                val orderKey = if (parentUri == getFolderUri()) {
+                    ListOrder.UNFILED_KEY
+                } else {
+                    parent.name
+                }
+                if (!orderKey.isNullOrEmpty()) {
+                    val displayName = fileName.removeSuffix(".md")
+                    writeOrder { current ->
+                        current.withListOrder(
+                            orderKey,
+                            (current.lists[orderKey] ?: emptyList()) + displayName,
+                        )
+                    }
+                }
 
                 scheduleWidgetUpdate()
                 created.uri
