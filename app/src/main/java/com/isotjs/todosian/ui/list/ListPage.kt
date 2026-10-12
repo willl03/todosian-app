@@ -246,6 +246,7 @@ fun ListPage(
                     onValueChange = { sheetText = it },
                     singleLine = true,
                     label = { Text(text = stringResource(hintRes)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier
                         .fillMaxWidth()
                         .bringIntoViewRequester(todoTextBringIntoView)
