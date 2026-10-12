@@ -132,9 +132,13 @@ class CategoryViewModel(
             } else {
                 val rows = buildPickerRows(
                     folders = content.folders.map { folder ->
-                        folder.displayName to folder.lists
-                            .filterNot { it.uri == categoryUri }
-                            .map { MoveTarget(title = it.displayName, uri = it.uri) }
+                        Triple(
+                            folder.uri.toString(),
+                            folder.displayName,
+                            folder.lists
+                                .filterNot { it.uri == categoryUri }
+                                .map { MoveTarget(title = it.displayName, uri = it.uri) },
+                        )
                     },
                     unfiledLists = content.unfiledLists
                         .filterNot { it.uri == categoryUri }

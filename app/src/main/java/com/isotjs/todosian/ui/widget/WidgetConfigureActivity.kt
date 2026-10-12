@@ -216,7 +216,7 @@ private fun WidgetConfigureScreen(
         val content = fileRepository.getVaultContent(includeCounts = true)
             .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
         pickerRows = buildPickerRows<Category>(
-            folders = content.folders.map { it.displayName to it.lists },
+            folders = content.folders.map { Triple(it.uri.toString(), it.displayName, it.lists) },
             unfiledLists = content.unfiledLists,
         )
         isLoading = false
@@ -329,6 +329,17 @@ private fun WidgetConfigureScreen(
                                         },
                                     )
                                 },
+                                supportingContent = {
+                                    // Bindable folders get a hint that tapping the header
+                                    // selects the whole folder rather than a single list.
+                                    if (row.uri != null) {
+                                        Text(
+                                            text = stringResource(R.string.widget_configure_folder_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
                                 leadingContent = {
                                     Icon(
                                         imageVector = Icons.Filled.Folder,
@@ -339,6 +350,18 @@ private fun WidgetConfigureScreen(
                                 colors = ListItemDefaults.colors(
                                     containerColor = Color.Transparent,
                                 ),
+                                modifier = row.uri?.let { uri ->
+                                    Modifier.clickable {
+                                        onConfirm(
+                                            WidgetSelection(
+                                                categoryUri = null,
+                                                categoryName = null,
+                                                folderUri = uri,
+                                                folderName = row.name,
+                                            ),
+                                        )
+                                    }
+                                } ?: Modifier,
                             )
 
                             is PickerRow.ListRow -> ListItem(

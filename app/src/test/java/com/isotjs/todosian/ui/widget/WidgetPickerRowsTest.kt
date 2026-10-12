@@ -22,8 +22,8 @@ class WidgetPickerRowsTest {
     fun `folders are headers with their lists nested, unfiled last`() {
         val rows = buildPickerRows<String>(
             folders = listOf(
-                "Alpha" to listOf("Inbox", "Projects"),
-                "Beta" to listOf("Ideas"),
+                Triple(null, "Alpha", listOf("Inbox", "Projects")),
+                Triple(null, "Beta", listOf("Ideas")),
             ),
             unfiledLists = listOf("Quick notes"),
         )
@@ -45,7 +45,7 @@ class WidgetPickerRowsTest {
     @Test
     fun `unfiled header is absent when the vault root has no lists`() {
         val rows = buildPickerRows<String>(
-            folders = listOf("Work" to listOf<String>("Inbox")),
+            folders = listOf(Triple(null, "Work", listOf<String>("Inbox"))),
             unfiledLists = emptyList(),
         )
 
@@ -62,7 +62,7 @@ class WidgetPickerRowsTest {
 
     @Test
     fun `folders without lists still show their header`() {
-        val rows = buildPickerRows<String>(folders = listOf("Empty" to emptyList<String>()), unfiledLists = emptyList())
+        val rows = buildPickerRows<String>(folders = listOf(Triple(null, "Empty", emptyList<String>())), unfiledLists = emptyList())
 
         assertEquals(listOf("Empty"), describe(rows))
     }
