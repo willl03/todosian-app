@@ -149,6 +149,20 @@ data class StoredOrder(
         val section = lists[parentPath] ?: return this
         return copy(lists = lists + (parentPath to section.map { if (it == oldName) newName else it }))
     }
+
+    /**
+     * Drops folder entries and lists sections whose parent folder no longer exists (e.g. the
+     * folder was renamed or deleted outside the app), keeping the file from growing stale keys
+     * forever. Null [validParents] (scan failed) leaves the order untouched — stale entries are
+     * inert anyway. Pure so it can be unit tested.
+     */
+    fun pruneSections(validParents: Set<String>?): StoredOrder {
+        if (validParents == null) return this
+        return copy(
+            folders = folders.filter { it in validParents },
+            lists = lists.filterKeys { it == ListOrder.UNFILED_KEY || it in validParents },
+        )
+    }
 }
 
 /**

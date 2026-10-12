@@ -236,4 +236,44 @@ class ListOrderStoreTest {
     }
 
     // endregion
+
+    // region pruneSections
+
+    @Test
+    fun `prune removes stale folder entries and lists sections`() {
+        val order = StoredOrder(
+            folders = listOf("Work", "Gone"),
+            lists = mapOf(
+                "Work" to listOf("a"),
+                "Gone" to listOf("b"),
+                ListOrder.UNFILED_KEY to listOf("c"),
+            ),
+        )
+
+        val pruned = order.pruneSections(setOf("Work"))
+
+        assertEquals(listOf("Work"), pruned.folders)
+        assertEquals(
+            mapOf("Work" to listOf("a"), ListOrder.UNFILED_KEY to listOf("c")),
+            pruned.lists,
+        )
+    }
+
+    @Test
+    fun `prune keeps unfiled section always`() {
+        val order = StoredOrder(lists = mapOf(ListOrder.UNFILED_KEY to listOf("a"), "X" to listOf("b")))
+
+        val pruned = order.pruneSections(emptySet())
+
+        assertEquals(mapOf(ListOrder.UNFILED_KEY to listOf("a")), pruned.lists)
+    }
+
+    @Test
+    fun `prune with null valid parents is a no-op`() {
+        val order = StoredOrder(folders = listOf("X"), lists = mapOf("X" to listOf("a")))
+
+        assertEquals(order, order.pruneSections(null))
+    }
+
+    // endregion
 }

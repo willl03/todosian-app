@@ -381,9 +381,7 @@ class SafFileRepository(
                 // place. Best-effort — if the order write fails, the folder falls back to the
                 // end of the list (A–Z), which is the pre-ordering behavior anyway.
                 if (currentName.isNotBlank()) {
-                    getFolderUri()?.let { rootUri ->
-                        orderStore.write(rootUri) { it.withRenamedFolder(currentName, cleaned) }
-                    }
+                    writeOrder { it.withRenamedFolder(currentName, cleaned) }
                 }
                 scheduleWidgetUpdate()
             }
@@ -470,11 +468,7 @@ class SafFileRepository(
                 // Keep the manual order: rename the list's entry in its folder's section, in
                 // place. Best-effort, same trade-off as folder renames.
                 if (currentName.isNotBlank()) {
-                    getFolderUri()?.let { rootUri ->
-                        orderStore.write(rootUri) {
-                            it.withRenamedList(parentPath, currentName, fileName.removeSuffix(".md"))
-                        }
-                    }
+                    writeOrder { it.withRenamedList(parentPath, currentName, fileName.removeSuffix(".md")) }
                 }
                 scheduleWidgetUpdate()
             }
@@ -575,15 +569,27 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit> {
-        val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
-        return orderStore.write(folderUri) { it.withFolderOrder(orderedFolderPaths) }
-            .onSuccess { scheduleWidgetUpdate() }
-    }
+    override suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit> =
+        writeOrder { it.withFolderOrder(orderedFolderPaths) }
 
-    override suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit> {
+    override suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit> =
+        writeOrder { it.withListOrder(parentPath, orderedListNames) }
+
+    /**
+     * Writes one order-file section through the store, pruning folder entries and lists
+     * sections whose parent no longer exists (folders renamed/deleted outside the app would
+     * otherwise leave stale keys forever). Also refreshes widgets, whose "All lists" order
+     * follows the manual order.
+     */
+    private suspend fun writeOrder(transform: (StoredOrder) -> StoredOrder): Result<Unit> {
         val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
-        return orderStore.write(folderUri) { it.withListOrder(parentPath, orderedListNames) }
+        val validParents = runCatching {
+            rootDocument()?.listFiles()
+                ?.filter { it.isDirectory && !isIgnoredEntryName(it.name) }
+                ?.mapNotNull { it.name }
+                ?.toSet()
+        }.getOrNull()
+        return orderStore.write(folderUri) { transform(it).pruneSections(validParents) }
             .onSuccess { scheduleWidgetUpdate() }
     }
 
