@@ -2,10 +2,10 @@ package com.isotjs.todosian.ui.components
 
 import android.app.DatePickerDialog
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Repeat
@@ -32,6 +32,8 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -39,20 +41,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
@@ -66,8 +66,7 @@ import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.utils.MarkdownParser
 import java.time.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("DEPRECATION") // dismissState this little fella causes problems with the new Material3 API, so we have to use the deprecated one for now
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TodoRow(
     todo: Todo,
@@ -83,208 +82,155 @@ fun TodoRow(
     showSubtaskButton: Boolean = true,
 ) {
     val indentPadding = (todo.indentLevel * 12).coerceAtMost(48).dp
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> onRequestDelete()
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    if (todo.indentLevel == 0) {
-                        onRequestMove?.invoke()
-                    }
-                }
-                else -> Unit
-            }
-            false
-        },
-    )
     val rowShape = MaterialTheme.shapes.large
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    SwipeToDismissBox(
-        modifier = modifier.padding(start = indentPadding),
-        state = dismissState,
-        enableDismissFromStartToEnd = allowMove && todo.indentLevel == 0,
-        backgroundContent = {
-            TodoSwipeBackground(
-                dismissState = dismissState,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+            .padding(start = indentPadding)
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 shape = rowShape,
             )
-        },
-        content = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        shape = rowShape,
-                    )
-                    .clip(rowShape)
-                    .clickable(onClick = onEdit)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            .clip(rowShape)
+            // Tap opens the editor; long-press opens the Move/Delete actions (the swipe
+            // gestures were removed — they fought with the pager's horizontal swipes).
+            .combinedClickable(
+                onClick = onEdit,
+                onLongClick = { menuExpanded = true },
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+            Checkbox(
+                checked = todo.isDone,
+                onCheckedChange = { onToggle() },
+            )
+            Column(
+                modifier = Modifier.weight(1f),
             ) {
-                Checkbox(
-                    checked = todo.isDone,
-                    onCheckedChange = { onToggle() },
+                val targetColor = if (todo.isDone) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+                val textColor by animateColorAsState(
+                    targetValue = targetColor,
+                    animationSpec = tween(300),
+                    label = "todo-text-color",
                 )
-                Column(
-                    modifier = Modifier.weight(1f),
+                val priorityColor = priorityColorFor(todo.priority)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val targetColor = if (todo.isDone) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                    val textColor by animateColorAsState(
-                        targetValue = targetColor,
-                        animationSpec = tween(300),
-                        label = "todo-text-color",
-                    )
-                    val priorityColor = priorityColorFor(todo.priority)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (priorityColor != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(color = priorityColor, shape = CircleShape),
-                            )
-                        }
-                        Text(
-                            text = todo.text,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textDecoration = if (todo.isDone) TextDecoration.LineThrough else TextDecoration.None,
-                            color = textColor,
+                    if (priorityColor != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(color = priorityColor, shape = CircleShape),
                         )
                     }
+                    Text(
+                        text = todo.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textDecoration = if (todo.isDone) TextDecoration.LineThrough else TextDecoration.None,
+                        color = textColor,
+                    )
+                }
 
-                    if (enableTasksPluginSupport) {
-                        val chips = buildTasksMetaChips(todo = todo, useEmojisInUi = useEmojisInUi)
-                        if (chips.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                            ) {
-                                chips.forEach { chip ->
-                                    val chipColors = chip.color?.let { color ->
-                                        AssistChipDefaults.assistChipColors(
-                                            containerColor = color,
-                                            labelColor = MaterialTheme.colorScheme.onSurface,
-                                            leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
-                                        )
-                                    }
-                                    androidx.compose.material3.AssistChip(
-                                        onClick = {},
-                                        enabled = false,
-                                        colors = chipColors ?: AssistChipDefaults.assistChipColors(),
-                                        leadingIcon = chip.icon?.let { icon ->
-                                            {
-                                                Icon(
-                                                    imageVector = icon,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            }
-                                        },
-                                        label = {
-                                            Text(
-                                                text = chip.label,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        },
+                if (enableTasksPluginSupport) {
+                    val chips = buildTasksMetaChips(todo = todo, useEmojisInUi = useEmojisInUi)
+                    if (chips.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                        ) {
+                            chips.forEach { chip ->
+                                val chipColors = chip.color?.let { color ->
+                                    AssistChipDefaults.assistChipColors(
+                                        containerColor = color,
+                                        labelColor = MaterialTheme.colorScheme.onSurface,
+                                        leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
                                     )
                                 }
+                                androidx.compose.material3.AssistChip(
+                                    onClick = {},
+                                    enabled = false,
+                                    colors = chipColors ?: AssistChipDefaults.assistChipColors(),
+                                    leadingIcon = chip.icon?.let { icon ->
+                                        {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            text = chip.label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                )
                             }
                         }
                     }
                 }
-                if (showSubtaskButton && todo.indentLevel < 2) {
-                    IconButton(onClick = onAddSubtask) {
-                        Icon(
-                            imageVector = Icons.Outlined.SubdirectoryArrowRight,
-                            contentDescription = stringResource(R.string.cd_add_subtask),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            }
+            if (showSubtaskButton && todo.indentLevel < 2) {
+                IconButton(onClick = onAddSubtask) {
+                    Icon(
+                        imageVector = Icons.Outlined.SubdirectoryArrowRight,
+                        contentDescription = stringResource(R.string.cd_add_subtask),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-        },
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TodoSwipeBackground(
-    dismissState: SwipeToDismissBoxState,
-    shape: Shape,
-) {
-    val direction = dismissState.dismissDirection
-    val targetBackgroundColor = when (direction) {
-        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
-        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainer
-    }
-    val backgroundColor by animateColorAsState(
-        targetValue = targetBackgroundColor,
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "swipe-bg-color",
-    )
-    val icon = when (direction) {
-        SwipeToDismissBoxValue.EndToStart -> Icons.Filled.Delete
-        SwipeToDismissBoxValue.StartToEnd -> Icons.AutoMirrored.Outlined.ArrowForward
-        else -> Icons.Filled.Delete
-    }
-    val targetContentColor = when (direction) {
-        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.onErrorContainer
-        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val contentColor by animateColorAsState(
-        targetValue = targetContentColor,
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "swipe-content-color",
-    )
-    val alignment = when (direction) {
-        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-        else -> Alignment.CenterEnd
-    }
-    val isThresholdReached = dismissState.targetValue != SwipeToDismissBoxValue.Settled
-    val iconScale by animateFloatAsState(
-        targetValue = if (isThresholdReached) 1.25f else 0.85f,
-        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-        label = "swipe-icon-scale",
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                color = backgroundColor,
-                shape = shape,
-            )
-            .padding(horizontal = 20.dp),
-        contentAlignment = alignment,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = if (direction == SwipeToDismissBoxValue.StartToEnd) {
-                stringResource(R.string.category_move_title)
-            } else {
-                stringResource(R.string.cd_delete)
-            },
-            tint = contentColor,
-            modifier = Modifier.graphicsLayer {
-                scaleX = iconScale
-                scaleY = iconScale
-            },
-        )
+        Box {
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                // Move is only offered for top-level entries; subtasks can't be moved.
+                if (allowMove && onRequestMove != null && todo.indentLevel == 0) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.todo_row_action_move)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.DriveFileMove,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onRequestMove?.invoke()
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.todo_row_action_delete)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onRequestDelete()
+                    },
+                )
+            }
+        }
     }
 }
 

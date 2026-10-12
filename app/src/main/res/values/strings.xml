@@ -81,6 +81,8 @@
     <string name="folder_action_reorder">Reorder sections</string>
     <string name="folder_action_add_section">Add section</string>
     <string name="folder_reorder_hint">Hold and drag to reorder</string>
+    <string name="todo_row_action_move">Move</string>
+    <string name="todo_row_action_delete">Delete</string>
 
     <!-- Category -->
     <string name="category_empty_title">No todos yet</string>
