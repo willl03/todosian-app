@@ -47,34 +47,39 @@ class HomeViewModel(
     }
 
     fun refresh(showLoading: Boolean = true) {
-        viewModelScope.launch {
-            val folderUri = fileRepository.getFolderUri()
-            if (folderUri == null) {
-                _events.emit(Event.RequireOnboarding)
-                _uiState.value = HomeUiState(isLoading = false)
-                return@launch
-            }
+        viewModelScope.launch { doRefresh(showLoading) }
+    }
 
-            val shouldShowLoading = showLoading || _uiState.value.folders.isEmpty()
-            if (shouldShowLoading) {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-            }
-            val result = fileRepository.getVaultContent()
-            if (result.isFailure) {
-                fileRepository.clearFolderUri()
-                _events.emit(Event.ShowMessage(R.string.error_folder_invalid))
-                _events.emit(Event.RequireOnboarding)
-                _uiState.value = HomeUiState(isLoading = false)
-                return@launch
-            }
+    /** Awaitable refresh for pull-to-refresh: completes when the re-scan is done. */
+    suspend fun refreshNow(showLoading: Boolean = false) = doRefresh(showLoading)
 
-            val content = result.getOrThrow()
-            _uiState.value = HomeUiState(
-                isLoading = false,
-                folders = content.folders,
-                unfiledLists = content.unfiledLists,
-            )
+    private suspend fun doRefresh(showLoading: Boolean) {
+        val folderUri = fileRepository.getFolderUri()
+        if (folderUri == null) {
+            _events.emit(Event.RequireOnboarding)
+            _uiState.value = HomeUiState(isLoading = false)
+            return
         }
+
+        val shouldShowLoading = showLoading || _uiState.value.folders.isEmpty()
+        if (shouldShowLoading) {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+        }
+        val result = fileRepository.getVaultContent()
+        if (result.isFailure) {
+            fileRepository.clearFolderUri()
+            _events.emit(Event.ShowMessage(R.string.error_folder_invalid))
+            _events.emit(Event.RequireOnboarding)
+            _uiState.value = HomeUiState(isLoading = false)
+            return
+        }
+
+        val content = result.getOrThrow()
+        _uiState.value = HomeUiState(
+            isLoading = false,
+            folders = content.folders,
+            unfiledLists = content.unfiledLists,
+        )
     }
 
     fun createFolder(name: String) {

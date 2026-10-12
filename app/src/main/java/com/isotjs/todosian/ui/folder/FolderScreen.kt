@@ -48,6 +48,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -134,7 +135,14 @@ class FolderViewModel(
     }
 
     fun refresh(showLoading: Boolean = true) {
-        viewModelScope.launch {
+        viewModelScope.launch { doRefresh(showLoading) }
+    }
+
+    /** Awaitable refresh for pull-to-refresh: completes when the re-scan is done. */
+    suspend fun refreshNow(showLoading: Boolean = false) = doRefresh(showLoading)
+
+    private suspend fun doRefresh(showLoading: Boolean) {
+        run {
             if (showLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
@@ -977,30 +985,40 @@ private fun FolderPage(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                TodosianLoadingIndicator()
+        var isRefreshing by remember { mutableStateOf(false) }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                scope.launch {
+                    viewModel.refreshNow(showLoading = false)
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TodosianLoadingIndicator()
+                }
             }
-            return@Scaffold
-        }
 
-        if (uiState.lists.isEmpty()) {
-            TodosianEmptyState(
-                icon = Icons.Outlined.Checklist,
-                title = stringResource(R.string.folder_empty_title),
-                subtitle = stringResource(R.string.folder_empty_subtitle),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            )
-            return@Scaffold
-        }
+            uiState.lists.isEmpty() -> {
+                TodosianEmptyState(
+                    icon = Icons.Outlined.Checklist,
+                    title = stringResource(R.string.folder_empty_title),
+                    subtitle = stringResource(R.string.folder_empty_subtitle),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
+            else -> {
         val listState = rememberLazyListState()
         val dragState = remember(listState) {
             DragReorderState(
@@ -1050,6 +1068,9 @@ private fun FolderPage(
                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                 }
             }
+        }
+        }
+        }
         }
     }
 }

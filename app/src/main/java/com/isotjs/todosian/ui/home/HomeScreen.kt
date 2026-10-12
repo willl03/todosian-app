@@ -48,6 +48,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -382,6 +383,20 @@ fun HomeScreen(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
+        var isRefreshing by remember { mutableStateOf(false) }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                scope.launch {
+                    viewModel.refreshNow(showLoading = false)
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
         // Folders A–Z (or manual order via the reorder feature); "Unfiled lists" is the last
         // row so its position matches the folder pager, where it is the rightmost page. It is
         // a virtual pseudo-folder: fixed at the bottom, not reorderable.
@@ -542,6 +557,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 }
