@@ -535,14 +535,6 @@ internal fun buildTasksMetaChips(
         }
         chips.add(TasksMetaChipUi(label = label, icon = if (useEmojisInUi) null else Icons.Outlined.FlightTakeoff))
     }
-    todo.createdDate?.let { value ->
-        val label = if (useEmojisInUi) {
-            stringResource(R.string.category_tasks_chip_created, value)
-        } else {
-            stringResource(R.string.category_tasks_chip_created_label, value)
-        }
-        chips.add(TasksMetaChipUi(label = label, icon = if (useEmojisInUi) null else Icons.Outlined.AddCircle))
-    }
     todo.completionDate?.let { value ->
         val label = if (useEmojisInUi) {
             stringResource(R.string.category_tasks_chip_done, value)
