@@ -1071,9 +1071,9 @@ private fun FolderPage(
             ) { listIndex, list ->
                 val rowKey = list.uri.toString()
                 Column(modifier = Modifier.animateItem(
-                    fadeInSpec = tween(180),
+                    fadeInSpec = null,
                     placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    fadeOutSpec = tween(160),
+                    fadeOutSpec = null,
                 )) {
                     DragReorderIndicatorSlot(dragState, rowKey)
                     TodoListRow(

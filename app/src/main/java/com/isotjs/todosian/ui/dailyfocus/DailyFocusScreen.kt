@@ -326,9 +326,9 @@ fun DailyFocusScreen(
                         allowMove = false,
                         showSubtaskButton = false,
                         modifier = Modifier.animateItem(
-                            fadeInSpec = tween(durationMillis = 180),
+                            fadeInSpec = null,
                             placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                            fadeOutSpec = tween(durationMillis = 160),
+                            fadeOutSpec = null,
                         ),
                     )
                     Spacer(modifier = Modifier.height(8.dp))

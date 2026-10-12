@@ -512,9 +512,9 @@ fun HomeScreen(
                             ) { folderIndex, folder ->
                                 val rowKey = folder.uri.toString()
                                 Column(modifier = Modifier.animateItem(
-                                    fadeInSpec = tween(durationMillis = 180),
+                                    fadeInSpec = null,
                                     placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                    fadeOutSpec = tween(durationMillis = 160),
+                                    fadeOutSpec = null,
                                 )) {
                                     DragReorderIndicatorSlot(dragState, rowKey)
                                     FolderRow(
@@ -540,9 +540,9 @@ fun HomeScreen(
                                 item(key = unfiledFolder.uri.toString()) {
                                     val rowKey = unfiledFolder.uri.toString()
                                     Column(modifier = Modifier.animateItem(
-                                        fadeInSpec = tween(durationMillis = 180),
+                                        fadeInSpec = null,
                                         placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                                        fadeOutSpec = tween(durationMillis = 160),
+                                        fadeOutSpec = null,
                                     )) {
                                         DragReorderIndicatorSlot(dragState, rowKey)
                                         FolderRow(

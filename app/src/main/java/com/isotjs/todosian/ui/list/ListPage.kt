@@ -831,13 +831,6 @@ fun ListPage(
                             deleteTodoHasSubtasks = MarkdownParser.hasSubtasks(uiState.lines, todo.lineIndex)
                         },
                         onRequestMove = { moveTodoTarget = todo },
-                        modifier = Modifier.animateItem(
-                            fadeInSpec = tween(durationMillis = 180),
-                            placementSpec = spring(
-                                stiffness = Spring.StiffnessMediumLow,
-                            ),
-                            fadeOutSpec = tween(durationMillis = 160),
-                        ),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -885,13 +878,6 @@ fun ListPage(
                             deleteTodoHasSubtasks = MarkdownParser.hasSubtasks(uiState.lines, todo.lineIndex)
                         },
                         onRequestMove = { moveTodoTarget = todo },
-                        modifier = Modifier.animateItem(
-                            fadeInSpec = tween(durationMillis = 180),
-                            placementSpec = spring(
-                                stiffness = Spring.StiffnessMediumLow,
-                            ),
-                            fadeOutSpec = tween(durationMillis = 160),
-                        ),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -937,13 +923,6 @@ fun ListPage(
                             deleteTodoHasSubtasks = MarkdownParser.hasSubtasks(uiState.lines, todo.lineIndex)
                         },
                         onRequestMove = { moveTodoTarget = todo },
-                        modifier = Modifier.animateItem(
-                            fadeInSpec = tween(durationMillis = 180),
-                            placementSpec = spring(
-                                stiffness = Spring.StiffnessMediumLow,
-                            ),
-                            fadeOutSpec = tween(durationMillis = 160),
-                        ),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
