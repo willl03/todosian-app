@@ -662,11 +662,11 @@ fun CategoryScreen(
     Scaffold(
         topBar = {
             // Compact section bar: moves with the pages; the fixed folder bar (name, folder
-            // menu) lives one level up in the section pager. The back navigation is there too.
+            // menu) lives one level up in the section pager. No status-bar inset here — the
+            // pager's top bar already accounts for it.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(
                         horizontal = TodosianDimens.ScreenHorizontalPadding,
                         vertical = 6.dp,
