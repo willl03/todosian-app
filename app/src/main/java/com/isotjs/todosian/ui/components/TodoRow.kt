@@ -244,6 +244,9 @@ fun TasksMetaEditor(
     modifier: Modifier = Modifier,
 ) {
     val isAdd = mode is TodoSheetMode.Add
+    // The completion date is set automatically when a task is checked in the list; the field
+    // is only surfaced when editing an already-completed task, to view or correct the date.
+    val isDoneTodo = (mode as? TodoSheetMode.Edit)?.todo?.isDone == true
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -276,6 +279,17 @@ fun TasksMetaEditor(
             onPick = { picked -> onMetaChange(meta.copy(dueDate = picked)) },
             onClear = { onMetaChange(meta.copy(dueDate = null)) },
         )
+
+        if (isDoneTodo) {
+            DateMetaRow(
+                label = if (useEmojisInUi) stringResource(R.string.category_tasks_done) else stringResource(R.string.category_tasks_done_label),
+                icon = if (useEmojisInUi) null else Icons.Outlined.CheckCircle,
+                value = meta.completionDate,
+                allowClear = true,
+                onPick = { picked -> onMetaChange(meta.copy(completionDate = picked)) },
+                onClear = { onMetaChange(meta.copy(completionDate = null)) },
+            )
+        }
 
         // Start, scheduled, and completion dates are intentionally not editable here: the
         // completion date is set automatically when a task is checked in the list, and the
