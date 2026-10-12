@@ -228,7 +228,7 @@ class TodosianWidget : GlanceAppWidget() {
                         items = items,
                         itemId = { item -> (item.categoryUri + ":" + item.todo.lineIndex + ":" + item.todo.text + ":" + item.todo.isDone).hashCode().toLong() },
                     ) { item ->
-                        TaskRow(item)
+                        TaskRow(item, showSourceList = selectedCategoryUri == null)
                     }
                 }
             }
@@ -236,7 +236,7 @@ class TodosianWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun TaskRow(item: WidgetTaskItem) {
+    private fun TaskRow(item: WidgetTaskItem, showSourceList: Boolean) {
         val todo = item.todo
         val isDone = todo.isDone
 
@@ -276,7 +276,10 @@ class TodosianWidget : GlanceAppWidget() {
                 )
 
                 val details = listOfNotNull(
-                    item.listName.takeIf { it.isNotBlank() },
+                    // In "All lists" mode the source list disambiguates mixed rows; a widget
+                    // bound to a single list already shows that name in the header, so the
+                    // per-row label would only repeat it under every entry.
+                    item.listName.takeIf { showSourceList && it.isNotBlank() },
                     todo.dueDate?.let { "📅 $it" },
                 ).joinToString(" • ")
 
