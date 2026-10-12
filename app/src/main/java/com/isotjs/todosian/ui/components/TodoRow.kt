@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Event
@@ -58,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -140,6 +143,31 @@ fun TodoRow(
                         textDecoration = if (todo.isDone) TextDecoration.LineThrough else TextDecoration.None,
                         color = textColor,
                     )
+                }
+
+                // The task's note: shown as a simple text row above the metadata line,
+                // only when the task carries one. Edited in the add/edit sheet.
+                if (!todo.note.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = todo.note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
 
                 if (enableTasksPluginSupport) {
@@ -295,6 +323,32 @@ fun TasksMetaEditor(
         // completion date is set automatically when a task is checked in the list, and the
         // other two tokens remain supported in the files (edited in Obsidian) without being
         // surfaced in this sheet.
+
+        OutlinedTextField(
+            value = meta.note.orEmpty(),
+            onValueChange = { value ->
+                onMetaChange(meta.copy(note = value.ifBlank { null }))
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            },
+            label = {
+                Text(
+                    text = if (useEmojisInUi) {
+                        stringResource(R.string.category_tasks_note)
+                    } else {
+                        stringResource(R.string.category_tasks_note_label)
+                    },
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         PriorityMetaRow(
             value = meta.priority,

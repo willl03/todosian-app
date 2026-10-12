@@ -33,6 +33,7 @@ data class Todo(
     val scheduledDate: String? = null, // ⏳ YYYY-MM-DD
     val completionDate: String? = null, // ✅ YYYY-MM-DD
     val createdDate: String? = null, // ➕ YYYY-MM-DD
+    val note: String? = null, // 📝 free-form note (last token on the line)
     val priority: TasksPriority? = null,
     val recurrence: String? = null, // 🔁 <text>
 )

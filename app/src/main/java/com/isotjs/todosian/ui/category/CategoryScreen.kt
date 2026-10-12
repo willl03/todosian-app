@@ -838,6 +838,7 @@ fun CategoryScreen(
                                 createdDate = todo.createdDate,
                                 priority = todo.priority,
                                 recurrence = todo.recurrence,
+                                note = todo.note,
                             )
                         },
                         onAddSubtask = {
@@ -885,6 +886,7 @@ fun CategoryScreen(
                                 createdDate = todo.createdDate,
                                 priority = todo.priority,
                                 recurrence = todo.recurrence,
+                                note = todo.note,
                             )
                         },
                         onAddSubtask = {
@@ -930,6 +932,7 @@ fun CategoryScreen(
                                 createdDate = todo.createdDate,
                                 priority = todo.priority,
                                 recurrence = todo.recurrence,
+                                note = todo.note,
                             )
                         },
                         onAddSubtask = {

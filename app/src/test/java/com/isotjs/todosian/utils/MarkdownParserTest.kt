@@ -1,5 +1,6 @@
 package com.isotjs.todosian.utils
 
+import com.isotjs.todosian.data.model.TasksPriority
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -626,5 +627,39 @@ class MarkdownParserTest {
             "- [ ] Multi-date 🛫 2024-03-22 ⏳ 2024-03-25 📅 2024-03-27 🔁 every week",
             result[0],
         )
+    }
+
+    @Test
+    fun `note token is parsed into the todo and stripped from the text`() {
+        val todos = MarkdownParser.parse(listOf("- [ ] Buy milk 📝 check the organic aisle"))
+
+        assertEquals(1, todos.size)
+        assertEquals("Buy milk", todos[0].text)
+        assertEquals("check the organic aisle", todos[0].note)
+    }
+
+    @Test
+    fun `note is written as the last token and round-trips`() {
+        val meta = MarkdownParser.TasksMeta(
+            dueDate = "2026-10-12",
+            priority = TasksPriority.HIGH,
+            note = "see the linked doc",
+        )
+        val line = "- [ ] Task" + meta.toSuffixString()
+
+        assertEquals("- [ ] Task 📅 2026-10-12 ⏫ 📝 see the linked doc", line)
+
+        val parsed = MarkdownParser.parse(listOf(line)).single()
+        assertEquals("Task", parsed.text)
+        assertEquals("2026-10-12", parsed.dueDate)
+        assertEquals(TasksPriority.HIGH, parsed.priority)
+        assertEquals("see the linked doc", parsed.note)
+    }
+
+    @Test
+    fun `tasks without a note parse with a null note`() {
+        val todos = MarkdownParser.parse(listOf("- [ ] Plain task"))
+
+        assertEquals(null, todos.single().note)
     }
 }

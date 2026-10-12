@@ -15,6 +15,7 @@ object MarkdownParser {
 
     private val prioritySuffixRegex = Regex("""\s(🔺|⏫|🔼|🔽|⏬️?|⏬)\s*$""")
     private val recurrenceSuffixRegex = Regex("""\s🔁\s(.+?)\s*$""")
+    private val noteSuffixRegex = Regex("""\s📝\s(.+)$""")
 
     private val completionAnywhereRegex = Regex("""\s✅\s\d{4}-\d{2}-\d{2}(?=\s|$)""")
 
@@ -45,6 +46,7 @@ object MarkdownParser {
                 createdDate = parsed.meta.createdDate,
                 priority = parsed.meta.priority,
                 recurrence = parsed.meta.recurrence,
+                note = parsed.meta.note,
             )
         }
     }
@@ -429,6 +431,7 @@ object MarkdownParser {
         val createdDate: String? = null,
         val priority: TasksPriority? = null,
         val recurrence: String? = null,
+        val note: String? = null,
     ) {
         fun toSuffixString(): String {
             val parts = ArrayList<String>(8)
@@ -442,6 +445,9 @@ object MarkdownParser {
             if (prio != null && prio != TasksPriority.NONE) {
                 parts.add(priorityToEmoji(prio))
             }
+            // The note is written last: its suffix regex captures to end-of-line, so no
+            // other token may follow it.
+            if (!note.isNullOrBlank()) parts.add("📝 ${note.trim()}")
 
             return if (parts.isEmpty()) {
                 ""
@@ -463,6 +469,7 @@ object MarkdownParser {
         var createdDate: String? = null
         var priority: TasksPriority? = null
         var recurrence: String? = null
+        var note: String? = null
 
         while (true) {
             val completion = completionSuffixRegex.find(working)
@@ -521,6 +528,17 @@ object MarkdownParser {
                 continue
             }
 
+            val noteMatch = noteSuffixRegex.find(working)
+            if (noteMatch != null) {
+                // Captures to end-of-line: the note is always the last token when written
+                // by the app. (A note text that itself ends with a date-like suffix would
+                // be peeled first — an accepted edge case for hand-edited lines.)
+                note = noteMatch.groupValues[1].trim()
+                suffixParts.add(0, working.substring(noteMatch.range.first))
+                working = working.substring(0, noteMatch.range.first).trimEnd()
+                continue
+            }
+
             break
         }
 
@@ -535,6 +553,7 @@ object MarkdownParser {
                 createdDate = createdDate,
                 priority = priority,
                 recurrence = recurrence,
+                note = note,
             ),
         )
     }
