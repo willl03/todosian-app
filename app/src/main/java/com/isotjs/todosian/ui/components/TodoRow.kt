@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
@@ -276,37 +277,14 @@ fun TasksMetaEditor(
             onClear = { onMetaChange(meta.copy(dueDate = null)) },
         )
 
-        DateMetaRow(
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_start) else stringResource(R.string.category_tasks_start_label),
-            icon = if (useEmojisInUi) null else Icons.Outlined.FlightTakeoff,
-            value = meta.startDate,
-            allowClear = true,
-            onPick = { picked -> onMetaChange(meta.copy(startDate = picked)) },
-            onClear = { onMetaChange(meta.copy(startDate = null)) },
-        )
-
-        DateMetaRow(
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_scheduled) else stringResource(R.string.category_tasks_scheduled_label),
-            icon = if (useEmojisInUi) null else Icons.Outlined.Schedule,
-            value = meta.scheduledDate,
-            allowClear = true,
-            onPick = { picked -> onMetaChange(meta.copy(scheduledDate = picked)) },
-            onClear = { onMetaChange(meta.copy(scheduledDate = null)) },
-        )
-
-        DateMetaRow(
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_done) else stringResource(R.string.category_tasks_done_label),
-            icon = if (useEmojisInUi) null else Icons.Outlined.CheckCircle,
-            value = meta.completionDate,
-            allowClear = true,
-            onPick = { picked -> onMetaChange(meta.copy(completionDate = picked)) },
-            onClear = { onMetaChange(meta.copy(completionDate = null)) },
-        )
+        // Start, scheduled, and completion dates are intentionally not editable here: the
+        // completion date is set automatically when a task is checked in the list, and the
+        // other two tokens remain supported in the files (edited in Obsidian) without being
+        // surfaced in this sheet.
 
         PriorityMetaRow(
             value = meta.priority,
             onChange = { onMetaChange(meta.copy(priority = it)) },
-            useEmojisInUi = useEmojisInUi,
         )
 
         OutlinedTextField(
@@ -395,68 +373,48 @@ private fun DateMetaRow(
 private fun PriorityMetaRow(
     value: TasksPriority?,
     onChange: (TasksPriority?) -> Unit,
-    useEmojisInUi: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val scroll = rememberScrollState()
+    // Todoist-style priorities, mapped onto the Obsidian Tasks tokens the files use:
+    // P1 → 🔺 (highest), P2 → ⏫ (high), P3 → 🔼 (medium), P4 → no token (the default).
+    // Legacy 🔽/⏬ tasks stay supported by the parser but are not offered here.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(scroll),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        val lowestColor = colorResource(R.color.priority_lowest)
-        val lowColor = colorResource(R.color.priority_low)
-        val mediumColor = colorResource(R.color.priority_medium)
-        val highColor = colorResource(R.color.priority_high)
-        val highestColor = colorResource(R.color.priority_highest)
-
         Text(
             text = stringResource(R.string.category_tasks_priority),
             style = MaterialTheme.typography.bodyMedium,
         )
 
         PriorityChip(
-            selected = value == null,
-            label = stringResource(R.string.category_tasks_priority_none),
-            onClick = { onChange(null) },
-            icon = null,
-        )
-        PriorityChip(
-            selected = value == TasksPriority.LOWEST,
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_priority_lowest) else stringResource(R.string.category_tasks_priority_lowest_label),
-            onClick = { onChange(TasksPriority.LOWEST) },
-            icon = if (useEmojisInUi) null else Icons.Outlined.Star,
-            iconTint = lowestColor,
-        )
-        PriorityChip(
-            selected = value == TasksPriority.LOW,
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_priority_low) else stringResource(R.string.category_tasks_priority_low_label),
-            onClick = { onChange(TasksPriority.LOW) },
-            icon = if (useEmojisInUi) null else Icons.Outlined.Star,
-            iconTint = lowColor,
-        )
-        PriorityChip(
-            selected = value == TasksPriority.MEDIUM,
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_priority_medium) else stringResource(R.string.category_tasks_priority_medium_label),
-            onClick = { onChange(TasksPriority.MEDIUM) },
-            icon = if (useEmojisInUi) null else Icons.Outlined.Star,
-            iconTint = mediumColor,
+            selected = value == TasksPriority.HIGHEST,
+            label = stringResource(R.string.category_tasks_priority_p1),
+            onClick = { onChange(TasksPriority.HIGHEST) },
+            icon = Icons.Filled.Circle,
+            iconTint = colorResource(R.color.priority_highest),
         )
         PriorityChip(
             selected = value == TasksPriority.HIGH,
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_priority_high) else stringResource(R.string.category_tasks_priority_high_label),
+            label = stringResource(R.string.category_tasks_priority_p2),
             onClick = { onChange(TasksPriority.HIGH) },
-            icon = if (useEmojisInUi) null else Icons.Outlined.Star,
-            iconTint = highColor,
+            icon = Icons.Filled.Circle,
+            iconTint = colorResource(R.color.priority_high),
         )
         PriorityChip(
-            selected = value == TasksPriority.HIGHEST,
-            label = if (useEmojisInUi) stringResource(R.string.category_tasks_priority_highest) else stringResource(R.string.category_tasks_priority_highest_label),
-            onClick = { onChange(TasksPriority.HIGHEST) },
-            icon = if (useEmojisInUi) null else Icons.Outlined.Star,
-            iconTint = highestColor,
+            selected = value == TasksPriority.MEDIUM,
+            label = stringResource(R.string.category_tasks_priority_p3),
+            onClick = { onChange(TasksPriority.MEDIUM) },
+            icon = Icons.Filled.Circle,
+            iconTint = colorResource(R.color.priority_medium),
+        )
+        PriorityChip(
+            selected = value == null || value == TasksPriority.NONE,
+            label = stringResource(R.string.category_tasks_priority_p4),
+            onClick = { onChange(null) },
+            icon = Icons.Filled.Circle,
+            iconTint = colorResource(R.color.priority_low),
         )
     }
 }
@@ -539,9 +497,9 @@ internal fun buildTasksMetaChips(
         val label = when (prio) {
             TasksPriority.LOWEST -> if (useEmojisInUi) stringResource(R.string.category_tasks_priority_lowest) else stringResource(R.string.category_tasks_priority_lowest_label)
             TasksPriority.LOW -> if (useEmojisInUi) stringResource(R.string.category_tasks_priority_low) else stringResource(R.string.category_tasks_priority_low_label)
-            TasksPriority.MEDIUM -> if (useEmojisInUi) stringResource(R.string.category_tasks_priority_medium) else stringResource(R.string.category_tasks_priority_medium_label)
-            TasksPriority.HIGH -> if (useEmojisInUi) stringResource(R.string.category_tasks_priority_high) else stringResource(R.string.category_tasks_priority_high_label)
-            TasksPriority.HIGHEST -> if (useEmojisInUi) stringResource(R.string.category_tasks_priority_highest) else stringResource(R.string.category_tasks_priority_highest_label)
+            TasksPriority.MEDIUM -> stringResource(R.string.category_tasks_priority_p3)
+            TasksPriority.HIGH -> stringResource(R.string.category_tasks_priority_p2)
+            TasksPriority.HIGHEST -> stringResource(R.string.category_tasks_priority_p1)
             TasksPriority.NONE -> ""
         }
         chips.add(
