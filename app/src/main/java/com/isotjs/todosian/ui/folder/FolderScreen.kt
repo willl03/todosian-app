@@ -1034,7 +1034,6 @@ private fun FolderPage(
             contentPadding = PaddingValues(bottom = 96.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
         ) {
             itemsIndexed(

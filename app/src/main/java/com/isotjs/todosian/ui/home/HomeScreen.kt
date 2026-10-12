@@ -448,7 +448,6 @@ fun HomeScreen(
             label = "home-content",
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
         ) { state ->
             when (state) {
