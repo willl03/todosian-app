@@ -5,16 +5,34 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-5030C0" alt="License"></a>
 </p>
 
-> **This is my personal fork** of [isotjs/todosian-app](https://github.com/isotjs/todosian-app). Versions are marked as `upstream+fork.N` (for example `2.2.0+fork.1`). Main features added on top of upstream:
->
-> - **Folders** – group your lists into folders with emoji badges, colors, and manual drag-and-drop ordering
-> - **List pager** – swipe between the lists of a folder
-> - **Folder-aware widgets** – the picker mirrors your folder structure, task rows show their priority, and a widget bound to one list doesn't repeat its name under every entry
-> - **Show or hide completed tasks** – quick toggle in every list's menu
-> - **Due date + priority sorting** – tasks ordered by due date, ties broken by priority
-> - **Polished details** – new entries start with a capital letter
->
-> Everything below this notice is the upstream readme.
+<h2 align="center">This Fork</h2>
+
+<p align="center">
+  A personal, feature-rich fork of
+  <a href="https://github.com/isotjs/todosian-app">isotjs/todosian-app</a>.
+  Versions follow <code>upstream+fork.N</code> (current: <b>2.2.0+fork.2</b>).
+</p>
+
+- **Folders & navigation** — group lists into folders with emoji badges, colors, and
+  manual drag-and-drop ordering · tapping a folder opens its first list directly ·
+  swipe between a folder's lists · a dedicated folder view for reordering
+- **Powerful widgets** — bind a widget to a list *or* a whole folder (lists shown with
+  small headers, in your order) · the picker mirrors your folder structure · task
+  priorities on every row · an add button that follows the widget's binding
+- **Better tasks** — one-line notes with clickable links · Todoist-style priorities
+  (P1 red / P2 yellow / P3 blue / P4 default) · due date + priority sorting ·
+  long-press Move/Delete · capitalized new entries
+- **Polish** — show/hide completed in every list's menu · structured move/copy ·
+  deleting a list returns to the folder view
+
+<p align="center">
+  <a href="https://github.com/willl03/todosian-app/releases/latest">
+    <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png?raw=true" alt="Download from GitHub" height="75">
+  </a>
+</p>
+
+> **Note:** builds are signed with a personal key — install over any previous build of
+> this fork (not over upstream's F-Droid/Play builds). Everything below is the upstream readme.
 
 Todosian is an Android app for managing todo lists stored as Markdown files inside your Obsidian vault.
 
@@ -76,35 +94,6 @@ Non-todo lines are preserved. The app only edits the specific todo lines you cha
 1. Sync (or copy) your Obsidian todo folder to your Android device (Syncthing works well).
 2. Open Todosian and select that folder when prompted.
 3. Tap a category (a `.md` file) to manage its todos. 
-
-<h2 align="center">Download Now</h2>
-
-<div align="center">
-<table>
-  <tr>
-    <th align="center">F-Droid</th>
-    <th align="center">GitHub</th>
-    <th align="center">OpenApk</th>
-  </tr>
-  <tr>
-    <td align="center">
-      <a href="https://f-droid.org/packages/com.isotjs.todosian">
-        <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="75">
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/isotjs/todosian-app/releases/latest">
-        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png?raw=true" alt="Download from GitHub" height="75">
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://www.openapk.net/todosian-obsidian-markdown-todos/com.isotjs.todosian/">
-        <img src="https://www.openapk.net/images/openapk-badge.png" alt="Download from OpenApk" height="75">
-      </a>
-    </td>
-  </tr>
-</table>
-</div>
 
 <h2 align="center">Privacy</h2>
 
