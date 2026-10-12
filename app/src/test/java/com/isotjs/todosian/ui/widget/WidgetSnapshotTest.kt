@@ -24,10 +24,12 @@ class WidgetSnapshotTest {
         dueDate: String? = null,
         categoryUri: String = "content://category",
         categoryName: String = "Inbox",
+        priorityLabel: String? = null,
     ) = WidgetTaskItem(
         categoryUri = categoryUri,
         listName = categoryName,
         todo = todo(text, isDone, lineIndex, dueDate),
+        priorityLabel = priorityLabel,
     )
 
     @Test
@@ -37,7 +39,7 @@ class WidgetSnapshotTest {
             activeCount = 2,
             items = listOf(
                 item("Active task", lineIndex = 3),
-                item("Due task", lineIndex = 7, dueDate = "2026-10-12"),
+                item("Due task", lineIndex = 7, dueDate = "2026-10-12", priorityLabel = "🔺"),
                 item("Done task", isDone = true, lineIndex = 1),
             ),
         )
@@ -106,6 +108,25 @@ class WidgetSnapshotTest {
         smaller.writeTo(prefs)
 
         assertEquals(smaller, WidgetSnapshot.fromPreferences(prefs))
+    }
+
+    @Test
+    fun `stale priority label is cleared for the same item index`() {
+        val withPriority = WidgetSnapshot(
+            hasFolder = true,
+            activeCount = 1,
+            items = listOf(item("Prioritized", lineIndex = 0, priorityLabel = "🔺")),
+        )
+        val withoutPriority = WidgetSnapshot(
+            hasFolder = true,
+            activeCount = 1,
+            items = listOf(item("Now unprioritized", lineIndex = 0)),
+        )
+        val prefs = withPriority.toPreferences().toMutablePreferences()
+
+        withoutPriority.writeTo(prefs)
+
+        assertEquals(withoutPriority, WidgetSnapshot.fromPreferences(prefs))
     }
 
     @Test

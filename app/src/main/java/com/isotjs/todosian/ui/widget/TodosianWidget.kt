@@ -47,6 +47,8 @@ data class WidgetTaskItem(
     val categoryUri: String,
     val listName: String,
     val todo: Todo,
+    /** Pre-rendered priority label (emoji token or word), null when the task has none. */
+    val priorityLabel: String? = null,
 )
 
 class TodosianWidget : GlanceAppWidget() {
@@ -281,6 +283,7 @@ class TodosianWidget : GlanceAppWidget() {
                     // per-row label would only repeat it under every entry.
                     item.listName.takeIf { showSourceList && it.isNotBlank() },
                     todo.dueDate?.let { "📅 $it" },
+                    item.priorityLabel,
                 ).joinToString(" • ")
 
                 if (details.isNotEmpty()) {

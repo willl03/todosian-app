@@ -17,10 +17,14 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.isotjs.todosian.TodosianApplication
+import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.TasksPriority
+import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.utils.MarkdownParser
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -31,6 +35,31 @@ internal val KEY_SELECTED_CATEGORY_URI = stringPreferencesKey("selected_category
 internal val KEY_SELECTED_CATEGORY_NAME = stringPreferencesKey("selected_category_name")
 internal val KEY_SHOW_COMPLETED = booleanPreferencesKey("show_completed")
 private const val ITEM_KEY_PREFIX = "widget_item_"
+
+/**
+ * Per-priority labels for the widget's details line, honoring the Tasks-plugin "emojis in UI"
+ * setting: emoji tokens (Obsidian Tasks style) when enabled, plain words otherwise. A task
+ * without a priority (unset or `NONE`) maps to no label.
+ */
+internal fun priorityLabels(context: Context, useEmojisInUi: Boolean): Map<TasksPriority, String> {
+    return if (useEmojisInUi) {
+        mapOf(
+            TasksPriority.HIGHEST to "🔺",
+            TasksPriority.HIGH to "⏫",
+            TasksPriority.MEDIUM to "🔼",
+            TasksPriority.LOW to "🔽",
+            TasksPriority.LOWEST to "⏬",
+        )
+    } else {
+        mapOf(
+            TasksPriority.HIGHEST to context.getString(R.string.category_tasks_priority_highest_label),
+            TasksPriority.HIGH to context.getString(R.string.category_tasks_priority_high_label),
+            TasksPriority.MEDIUM to context.getString(R.string.category_tasks_priority_medium_label),
+            TasksPriority.LOW to context.getString(R.string.category_tasks_priority_low_label),
+            TasksPriority.LOWEST to context.getString(R.string.category_tasks_priority_lowest_label),
+        )
+    }
+}
 
 /**
  * Drops checked entries from the snapshot when the widget's "show completed" preference is off.
@@ -120,7 +149,8 @@ internal data class WidgetSnapshot(
     /**
      * Writes all snapshot keys into [prefs], first removing the item keys of any previous
      * snapshot. Without this, optional fields that are absent in the new snapshot (currently
-     * `due_date`) would keep stale values from whatever item previously occupied the same index.
+     * `due_date` and `priority_label`) would keep stale values from whatever item previously
+     * occupied the same index.
      */
     fun writeTo(prefs: MutablePreferences) {
         val previousCount = prefs[KEY_WIDGET_ITEM_COUNT] ?: 0
@@ -132,6 +162,7 @@ internal data class WidgetSnapshot(
             prefs.remove(stringPreferencesKey("${prefix}line_index"))
             prefs.remove(stringPreferencesKey("${prefix}is_done"))
             prefs.remove(stringPreferencesKey("${prefix}due_date"))
+            prefs.remove(stringPreferencesKey("${prefix}priority_label"))
         }
 
         prefs[KEY_WIDGET_HAS_FOLDER] = hasFolder
@@ -149,6 +180,7 @@ internal data class WidgetSnapshot(
             prefs[intPreferencesKey("${prefix}line_index")] = item.todo.lineIndex
             prefs[booleanPreferencesKey("${prefix}is_done")] = item.todo.isDone
             item.todo.dueDate?.let { prefs[stringPreferencesKey("${prefix}due_date")] = it }
+            item.priorityLabel?.let { prefs[stringPreferencesKey("${prefix}priority_label")] = it }
         }
     }
 
@@ -175,6 +207,7 @@ internal data class WidgetSnapshot(
                     WidgetTaskItem(
                         categoryUri = categoryUri,
                         listName = prefs[stringPreferencesKey("${prefix}category_name")] ?: "",
+                        priorityLabel = prefs[stringPreferencesKey("${prefix}priority_label")],
                         todo = Todo(
                             // `id` is a per-parse random UUID and is not part of the snapshot.
                             id = "",
@@ -234,6 +267,8 @@ object WidgetRefresher {
         }
 
         refreshMutex.withLock {
+            val settings = app.appSettingsRepository.settings.first()
+            val priorityLabels = priorityLabels(context, settings.tasksPluginUseEmojisInUi)
             val categories = fileRepository.getCategories(includeCounts = true).getOrDefault(emptyList())
             val widgetStates = glanceIds.map { glanceId ->
                 runCatching {
@@ -265,6 +300,7 @@ object WidgetRefresher {
                     linesByUri = linesByUri,
                     selection = selections[index],
                     showCompleted = showCompletedFlags[index],
+                    priorityLabels = priorityLabels,
                 )
                 runCatching {
                     updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
@@ -330,6 +366,7 @@ object WidgetRefresher {
         linesByUri: Map<Uri, List<String>>,
         selection: WidgetSelection,
         showCompleted: Boolean,
+        priorityLabels: Map<TasksPriority, String>,
     ): WidgetSnapshot {
         val resolved = resolveSelectedCategory(categories, selection)
 
@@ -355,6 +392,7 @@ object WidgetRefresher {
                     categoryUri = category.uri.toString(),
                     listName = category.displayName,
                     todo = todo,
+                    priorityLabel = priorityLabels[todo.priority],
                 )
             }
         }
