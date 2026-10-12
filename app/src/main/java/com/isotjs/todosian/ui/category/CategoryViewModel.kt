@@ -180,17 +180,13 @@ class CategoryViewModel(
             )
             val newUri = result.getOrNull()
             if (result.isFailure || newUri == null) {
-                // Self-heal: re-read from disk — the rename may have partially succeeded
-                // (e.g. the document was renamed but the order write failed).
-                refreshFromDisk(showLoading = false)
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
             }
-            // A rename issues the document a new URI: adopt it so subsequent edits hit the
-            // renamed file, surface the new title right away, and let the pager re-anchor.
+            // Adopt the renamed document's URI so edits in the rescan window still hit the
+            // renamed file; the pager rescans and re-keys the page (same position, fresh
+            // title/content) — exactly how the folder pager handles folder renames.
             categoryUri = newUri
-            _uiState.value = _uiState.value.copy(title = newName)
-            refreshFromDisk(showLoading = false)
             _events.emit(Event.CategoryRenamed(newName))
         }
     }

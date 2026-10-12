@@ -62,6 +62,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.Folder
+import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.FolderColorPickerSheet
@@ -92,8 +94,8 @@ data class ListPagerUiState(
     val parentFolderUri: Uri? = null,
     /** Live folder display name (may have been renamed since [parentPath] was seeded). */
     val folderName: String = "",
-    /** The section the user is currently on; re-anchored by name across folder renames. */
-    val currentListUri: String? = null,
+    /** One-shot: a newly created section the pager should scroll to (add-from-menu). */
+    val pendingJumpUri: String? = null,
 )
 
 /**
@@ -101,6 +103,10 @@ data class ListPagerUiState(
  * so widget intents can route straight into a section without knowing its folder. A fixed folder
  * bar (name, folder menu) stays on top while the pages — each a [CategoryScreen] with its own
  * compact section bar — swipe underneath.
+ *
+ * Same logic as the folder pager: the view model pins the FOLDER (stable across section
+ * renames, re-pinned by name across folder renames) and every scan rebuilds the pages from
+ * the fresh listing. The visible POSITION is the source of truth — no per-section anchoring.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -138,17 +144,26 @@ fun ListPagerScreen(
         pageCount = { pages.size },
     )
 
-    // Follow the view model's anchor: lands on the requested section the first time pages
-    // arrive, and re-anchors after a folder rename (when every page URI changes).
-    var anchoredUri by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(pages, uiState.currentListUri) {
-        val target = uiState.currentListUri ?: return@LaunchedEffect
-        if (target != anchoredUri) {
-            val index = pages.indexOfFirst { it.uri.toString() == target }
+    // Land once on the requested section (deep link / seed); after that the pager's position
+    // is preserved across re-scans, exactly like the folder pager.
+    var landed by remember { mutableStateOf(false) }
+    LaunchedEffect(pages, landed) {
+        if (!landed && pages.isNotEmpty()) {
+            val index = pages.indexOfFirst { it.uri == categoryUri }
             if (index >= 0) {
                 pagerState.scrollToPage(index)
-                anchoredUri = target
+                landed = true
             }
+        }
+    }
+
+    // One-shot jump to a section created from the folder menu (the pager follows it).
+    LaunchedEffect(pages, uiState.pendingJumpUri) {
+        val target = uiState.pendingJumpUri ?: return@LaunchedEffect
+        val index = pages.indexOfFirst { it.uri.toString() == target }
+        if (index >= 0) {
+            pagerState.scrollToPage(index)
+            pagerViewModel.jumpConsumed()
         }
     }
 
@@ -288,9 +303,7 @@ fun ListPagerScreen(
                         onCategoryDeleted(folderUri, uiState.parentPath.isBlank())
                     }
                 },
-                onCategoryRenamed = { newName ->
-                    pagerViewModel.onCategoryRenamed(newName)
-                },
+                onCategoryRenamed = { pagerViewModel.refresh() },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -476,14 +489,13 @@ class ListPagerViewModel(
     val events: SharedFlow<Event> = _events.asSharedFlow()
 
     /**
-     * The section the user is on. Matched by URI first; after a folder rename every child URI
-     * changes, so [anchorName] keeps the position stable across the re-scan.
+     * The pinned folder. Resolved on the first scan from the entry section (or the seed),
+     * then tracked by URI — which is stable across SECTION renames. Only a FOLDER rename
+     * invalidates it, and the display name (also re-tracked on every scan) is the fallback.
      */
-    private var anchorUri: Uri = categoryUri
-    private var anchorName: String? = null
-
-    /** Guards `refresh()`: only the most recently started scan may apply its result. */
-    private var scanGeneration = 0L
+    private var pinnedFolderUri: Uri? = null
+    private var pinnedFolderName: String? = null
+    private var pinnedIsUnfiled = false
 
     init {
         observeVaultChanges()
@@ -491,9 +503,9 @@ class ListPagerViewModel(
         // reconciles — the seed is a one-shot navigation argument.
         val seed = NavSeed.consumeListPager(categoryUri)
         if (seed != null) {
-            anchorName = seed.lists
-                .firstOrNull { it.uri == categoryUri }
-                ?.displayName
+            pinnedFolderUri = seed.parentFolderUri
+            pinnedFolderName = seed.parentPath
+            pinnedIsUnfiled = seed.parentPath.isBlank()
             _uiState.value = ListPagerUiState(
                 isLoading = false,
                 pages = seed.lists,
@@ -519,54 +531,71 @@ class ListPagerViewModel(
     }
 
     /**
-     * Re-scans the vault and re-anchors. Multiple refreshes can be in flight at once
-     * (rename events, the debounced file observer); a generation counter makes the
-     * last-STARTED scan the only one allowed to apply its result — a slower, stale scan
-     * must never overwrite fresher state (stale pages would re-key a page onto a URI that
-     * no longer exists, breaking the visible section until the next rescan).
+     * Re-scans the vault and rebuilds the pages from the fresh listing — the same logic as
+     * the folder pager. The visible pager position never moves; pages re-key onto their
+     * fresh URIs in place, so renames update the visible section without any anchoring.
      */
     fun refresh() {
-        val generation = ++scanGeneration
         viewModelScope.launch {
             val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
-            if (generation != scanGeneration) return@launch
-            // Find the folder holding the anchored section: by URI, then by display name
-            // (a folder rename changes every child URI; the name is what stays stable).
-            var containingFolder = content?.folders?.firstOrNull { folder ->
-                folder.lists.any { it.uri == anchorUri }
-            }
-            if (containingFolder == null && content != null && anchorName != null) {
-                containingFolder = content.folders.firstOrNull { folder ->
-                    folder.lists.any { it.displayName == anchorName }
+            if (content == null) return@launch // keep the current state on a failed read
+
+            val rootUri = fileRepository.getFolderUri()
+            val folder: Folder? = when {
+                pinnedIsUnfiled -> null
+                pinnedFolderUri != null ->
+                    content.folders.firstOrNull { it.uri == pinnedFolderUri }
+                        ?: content.folders.firstOrNull {
+                            pinnedFolderName != null && it.displayName == pinnedFolderName
+                        }
+                // First scan (widget deep link): find the folder holding the entry section.
+                else -> content.folders.firstOrNull { folder ->
+                    folder.lists.any { it.uri == categoryUri }
                 }
             }
-            val unfiled = containingFolder == null && content != null &&
-                content.unfiledLists.any { it.uri == anchorUri || it.displayName == anchorName }
-            val pages = containingFolder?.lists
-                ?: if (unfiled) content!!.unfiledLists else emptyList()
+            val unfiled = folder == null &&
+                (pinnedIsUnfiled || (pinnedFolderUri == null && rootUri != null &&
+                    content.unfiledLists.any { it.uri == categoryUri }))
+            val pages = when {
+                folder != null -> folder.lists
+                unfiled -> content.unfiledLists
+                else -> emptyList()
+            }
 
-            // Re-anchor: same section by URI, then by name, then the first page.
-            val current = pages.firstOrNull { it.uri == anchorUri }
-                ?: pages.firstOrNull { it.displayName == anchorName }
-                ?: pages.firstOrNull()
-            if (current != null) {
-                anchorUri = current.uri
-                anchorName = current.displayName
+            // Pin (or re-pin) the folder.
+            when {
+                folder != null -> {
+                    pinnedFolderUri = folder.uri
+                    pinnedFolderName = folder.displayName
+                    pinnedIsUnfiled = false
+                }
+                unfiled && rootUri != null -> {
+                    pinnedFolderUri = rootUri
+                    pinnedFolderName = ""
+                    pinnedIsUnfiled = true
+                }
+                else -> {} // nothing resolved yet; keep whatever was pinned
             }
 
             _uiState.value = ListPagerUiState(
                 isLoading = false,
                 pages = pages,
-                parentPath = containingFolder?.displayName ?: "",
-                parentFolderUri = containingFolder?.uri
-                    ?: if (pages.isNotEmpty()) fileRepository.getFolderUri() else null,
-                folderName = containingFolder?.displayName ?: "",
-                currentListUri = current?.uri?.toString(),
+                parentPath = folder?.displayName
+                    ?: if (unfiled) "" else _uiState.value.parentPath,
+                parentFolderUri = folder?.uri
+                    ?: if (unfiled) rootUri else _uiState.value.parentFolderUri,
+                folderName = folder?.displayName
+                    ?: if (unfiled) "" else _uiState.value.folderName,
             )
         }
     }
 
-    /** Creates a section in this folder and re-anchors the pager onto it. */
+    /** One-shot jump marker consumed by the screen after scrolling to the created section. */
+    fun jumpConsumed() {
+        _uiState.value = _uiState.value.copy(pendingJumpUri = null)
+    }
+
+    /** Creates a section in this folder; the pager follows it once the scan includes it. */
     fun createSection(name: String, onCreated: (Uri?) -> Unit = {}) {
         viewModelScope.launch {
             val folderUri = _uiState.value.parentFolderUri ?: return@launch
@@ -576,25 +605,23 @@ class ListPagerViewModel(
                 onCreated(null)
                 return@launch
             }
-            // Anchor on the new section so the pager follows it after the refresh.
-            anchorUri = created.getOrNull() ?: anchorUri
-            anchorName = name
             refresh()
+            _uiState.value = _uiState.value.copy(pendingJumpUri = created.getOrNull()?.toString())
             onCreated(created.getOrNull())
         }
     }
 
     /**
-     * Called when the visible section renames itself from its own menu: re-anchor onto the
-     * section by its new name (the rename invalidated its URI) and rescan immediately, so the
-     * pager re-keys the page onto the renamed document without waiting for the file observer.
+     * Called when the visible section renames itself from its own menu: just rescan — the
+     * pinned folder is untouched by section renames, the pages rebuild from the fresh
+     * listing, and the visible page re-keys onto the renamed document at the same position
+     * (the folder pager's rename logic, verbatim).
      */
-    fun onCategoryRenamed(newName: String) {
-        anchorName = newName
+    fun onCategoryRenamed() {
         refresh()
     }
 
-    /** Renames the folder; the scan re-anchors the visible section by name afterwards. */
+    /** Renames the folder; the scan re-resolves everything from the fresh listing. */
     fun renameFolder(newName: String) {
         viewModelScope.launch {
             val folderUri = _uiState.value.parentFolderUri ?: return@launch
