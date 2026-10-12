@@ -92,7 +92,6 @@ import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.PreferencesManager
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.AppSettingsRepository
-import com.isotjs.todosian.data.settings.CategorySort
 import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.data.settings.NewTodoFilePosition
 import com.isotjs.todosian.data.settings.ThemeMode
@@ -161,7 +160,6 @@ fun SettingsScreen(
     }
 
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showSortDialog by remember { mutableStateOf(false) }
     var showGroupingDialog by remember { mutableStateOf(false) }
     var showTodoSortDialog by remember { mutableStateOf(false) }
     var showNewTodoFilePositionDialog by remember { mutableStateOf(false) }
@@ -188,19 +186,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showSortDialog) {
-        SingleChoiceDialog(
-            title = stringResource(R.string.settings_category_sort),
-            options = listOf(
-                ChoiceOption(CategorySort.A_Z, stringResource(R.string.settings_sort_az)),
-                ChoiceOption(CategorySort.MOST_REMAINING, stringResource(R.string.settings_sort_remaining)),
-            ),
-            selected = settings.categorySort,
-            onSelected = { appSettingsRepository.setCategorySort(it) },
-            onDismiss = { showSortDialog = false },
-        )
-    }
-
     if (showGroupingDialog) {
         SingleChoiceDialog(
             title = stringResource(R.string.settings_todo_grouping),
@@ -220,6 +205,7 @@ fun SettingsScreen(
             options = listOf(
                 ChoiceOption(TodoSort.FILE_ORDER, stringResource(R.string.settings_todo_sort_file_order)),
                 ChoiceOption(TodoSort.PRIORITY_HIGH_TO_LOW, stringResource(R.string.settings_todo_sort_priority_desc)),
+                ChoiceOption(TodoSort.DUE_DATE_THEN_PRIORITY, stringResource(R.string.settings_todo_sort_due_priority)),
                 ChoiceOption(TodoSort.CREATED_DATE_NEWEST_FIRST, stringResource(R.string.settings_todo_sort_created_newest)),
                 ChoiceOption(TodoSort.DUE_DATE_EARLIEST_FIRST, stringResource(R.string.settings_todo_sort_due_earliest)),
             ),
@@ -526,15 +512,6 @@ fun SettingsScreen(
 
                         SettingsNavRow(
                             icon = Icons.AutoMirrored.Filled.Sort,
-                            title = stringResource(R.string.settings_category_sort),
-                            subtitle = categorySortLabel(settings.categorySort),
-                            onClick = { showSortDialog = true },
-                        )
-
-                        SettingsDivider()
-
-                        SettingsNavRow(
-                            icon = Icons.AutoMirrored.Filled.Sort,
                             title = stringResource(R.string.settings_todo_grouping),
                             subtitle = todoGroupingLabel(settings.todoGrouping),
                             onClick = { showGroupingDialog = true },
@@ -808,14 +785,6 @@ private fun themeModeLabel(mode: ThemeMode): String {
 }
 
 @Composable
-private fun categorySortLabel(sort: CategorySort): String {
-    return when (sort) {
-        CategorySort.A_Z -> stringResource(R.string.settings_sort_az)
-        CategorySort.MOST_REMAINING -> stringResource(R.string.settings_sort_remaining)
-    }
-}
-
-@Composable
 private fun todoGroupingLabel(grouping: TodoGrouping): String {
     return when (grouping) {
         TodoGrouping.GROUPED -> stringResource(R.string.settings_grouping_grouped)
@@ -828,6 +797,7 @@ private fun todoSortLabel(sort: TodoSort): String {
     return when (sort) {
         TodoSort.FILE_ORDER -> stringResource(R.string.settings_todo_sort_file_order)
         TodoSort.PRIORITY_HIGH_TO_LOW -> stringResource(R.string.settings_todo_sort_priority_desc)
+        TodoSort.DUE_DATE_THEN_PRIORITY -> stringResource(R.string.settings_todo_sort_due_priority)
         TodoSort.CREATED_DATE_NEWEST_FIRST -> stringResource(R.string.settings_todo_sort_created_newest)
         TodoSort.DUE_DATE_EARLIEST_FIRST -> stringResource(R.string.settings_todo_sort_due_earliest)
     }

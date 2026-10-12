@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -48,7 +49,7 @@ import androidx.lifecycle.lifecycleScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.ThemeMode
 import com.isotjs.todosian.ui.components.TodosianDimens
@@ -59,7 +60,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Configuration screen shown when the user places (or long-press → Edit reconfigures) the
- * Todosian widget. Lets them bind the widget instance to a single note, or keep it showing all
+ * Todosian widget. Lets them bind the widget instance to a single list, or keep it showing all
  * notes. The selection is persisted into that widget instance's Glance state.
  */
 class WidgetConfigureActivity : ComponentActivity() {
@@ -189,14 +190,14 @@ private fun WidgetConfigureScreen(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(fileRepository != null) }
-    var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var lists by remember { mutableStateOf<List<TodoList>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
         if (fileRepository == null) {
             isLoading = false
             return@LaunchedEffect
         }
-        categories = fileRepository.getCategories().getOrDefault(emptyList())
+        lists = fileRepository.getAllLists(includeCounts = true).getOrDefault(emptyList())
         isLoading = false
     }
 
@@ -272,13 +273,13 @@ private fun WidgetConfigureScreen(
                         )
                     }
                     items(
-                        items = categories,
+                        items = lists,
                         key = { it.uri.toString() },
-                    ) { category ->
+                    ) { list ->
                         ListItem(
-                            headlineContent = { Text(text = category.displayName) },
+                            headlineContent = { Text(text = list.displayName) },
                             supportingContent = {
-                                Text(text = "${category.todoCount} tasks")
+                                Text(text = pluralStringResource(R.plurals.widget_configure_task_count, list.todoCount, list.todoCount))
                             },
                             leadingContent = {
                                 Icon(
@@ -290,7 +291,7 @@ private fun WidgetConfigureScreen(
                                 containerColor = Color.Transparent,
                             ),
                             modifier = Modifier.clickable {
-                                onConfirm(WidgetSelection(category.uri.toString(), category.displayName))
+                                onConfirm(WidgetSelection(list.uri.toString(), list.displayName))
                             },
                         )
                     }

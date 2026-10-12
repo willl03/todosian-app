@@ -3,7 +3,6 @@ package com.isotjs.todosian.utils
 import com.isotjs.todosian.data.model.TasksPriority
 import com.isotjs.todosian.data.model.Todo
 import java.time.LocalDate
-import java.util.UUID
 
 object MarkdownParser {
     private val todoRegex = Regex("""^([ \t]*)- \[(x| )\] (.*)$""")
@@ -30,7 +29,11 @@ object MarkdownParser {
 
             val parsed = parseRemainder(remainder)
             Todo(
-                id = UUID.randomUUID().toString(),
+                // Stable across re-parses of unchanged content: the todo lists key their rows
+                // by [Todo.id], so a random id would re-key (and re-animate) every row on each
+                // re-read. lineIndex keeps ids unique; the text hash keeps toggles and metadata
+                // edits smooth while genuine text edits re-key that one row.
+                id = "$index-${parsed.mainText.hashCode()}",
                 text = parsed.mainText,
                 isDone = isDone,
                 lineIndex = index,

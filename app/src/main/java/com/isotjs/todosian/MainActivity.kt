@@ -15,8 +15,8 @@ import com.isotjs.todosian.ui.theme.TodosianTheme
 import com.isotjs.todosian.data.settings.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Request to open the add-task flow; [categoryUri] non-null routes straight into that note. */
-data class AddTaskRequest(val tick: Long, val categoryUri: String?)
+/** Request to open the add-task flow; [listUri] non-null routes straight into that list. */
+data class AddTaskRequest(val tick: Long, val listUri: String?)
 
 class MainActivity : ComponentActivity() {
 
@@ -72,16 +72,16 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val wantsGlobalAdd = intent?.getBooleanExtra(EXTRA_OPEN_ADD_TASK, false) == true
-        val categoryUri = intent?.getStringExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
-        if (wantsGlobalAdd || categoryUri != null) {
-            addTaskSignal.value = AddTaskRequest(addTaskSignal.value.tick + 1L, categoryUri)
+        val listUri = intent?.getStringExtra(EXTRA_OPEN_ADD_TASK_LIST)
+        if (wantsGlobalAdd || listUri != null) {
+            addTaskSignal.value = AddTaskRequest(addTaskSignal.value.tick + 1L, listUri)
             intent?.removeExtra(EXTRA_OPEN_ADD_TASK)
-            intent?.removeExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
+            intent?.removeExtra(EXTRA_OPEN_ADD_TASK_LIST)
         }
     }
 
     companion object {
         const val EXTRA_OPEN_ADD_TASK = "open_add_task"
-        const val EXTRA_OPEN_ADD_TASK_CATEGORY = "open_add_task_category"
+        const val EXTRA_OPEN_ADD_TASK_LIST = "open_add_task_list"
     }
 }

@@ -18,6 +18,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.isotjs.todosian.MainActivity
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.PreferencesManager
+import com.isotjs.todosian.data.SafFileRepository
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.settings.SharedPrefsAppSettingsRepository
 import com.isotjs.todosian.utils.MarkdownParser
@@ -139,16 +140,25 @@ object DueReminderNotifier {
     }
 
     private fun loadDueSoonTodos(context: Context, folderUri: Uri): List<DueTodo> {
-        val folder = DocumentFile.fromTreeUri(context, folderUri) ?: return emptyList()
+        val root = DocumentFile.fromTreeUri(context, folderUri) ?: return emptyList()
         val today = LocalDate.now()
 
-        return folder.listFiles()
+        // Lists live in the vault root (unfiled) and one level deep inside folders.
+        val listFiles = root.listFiles()
             .asSequence()
-            .filter { it.isFile }
-            .filter {
-                val name = it.name.orEmpty()
-                name.endsWith(".md", ignoreCase = true) && !name.contains("sync-conflict", ignoreCase = true)
+            .flatMap {
+                when {
+                    it.isFile -> sequenceOf(it)
+                    it.isDirectory && !SafFileRepository.isIgnoredEntryName(it.name) ->
+                        it.listFiles().asSequence()
+                    else -> emptySequence()
+                }
             }
+            .filter { it.isFile && SafFileRepository.isListFileName(it.name) }
+            .toList()
+
+        return listFiles
+            .asSequence()
             .flatMap { file ->
                 parseDueTodosFromFile(context, file, today).asSequence()
             }

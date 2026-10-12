@@ -27,8 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 data class DailyFocusTask(
     val todo: Todo,
-    val categoryUri: Uri,
-    val categoryName: String,
+    val listUri: Uri,
+    val listName: String,
 )
 
 data class DailyFocusUiState(
@@ -36,7 +36,7 @@ data class DailyFocusUiState(
     val tasks: List<DailyFocusTask> = emptyList(),
 
     internal val lineCache: Map<String, List<String>> = emptyMap(),
-    internal val categoryNames: Map<String, String> = emptyMap(),
+    internal val listNames: Map<String, String> = emptyMap(),
 )
 
 class DailyFocusViewModel(
@@ -83,25 +83,25 @@ class DailyFocusViewModel(
             }
 
             val today = LocalDate.now().toString()
-            val categoriesResult = fileRepository.getCategories()
-            if (categoriesResult.isFailure) {
+            val listsResult = fileRepository.getAllLists(includeCounts = false)
+            if (listsResult.isFailure) {
                 _uiState.value = DailyFocusUiState(isLoading = false)
                 return@launch
             }
 
-            val categories = categoriesResult.getOrThrow()
+            val lists = listsResult.getOrThrow()
             val tasks = mutableListOf<DailyFocusTask>()
             val lineCache = mutableMapOf<String, List<String>>()
-            val categoryNames = mutableMapOf<String, String>()
+            val listNames = mutableMapOf<String, String>()
 
-            for (category in categories) {
-                val linesResult = fileRepository.readLines(category.uri)
+            for (list in lists) {
+                val linesResult = fileRepository.readLines(list.uri)
                 if (linesResult.isFailure) continue
 
                 val lines = linesResult.getOrThrow()
-                val uriKey = category.uri.toString()
+                val uriKey = list.uri.toString()
                 lineCache[uriKey] = lines
-                categoryNames[uriKey] = category.displayName
+                listNames[uriKey] = list.displayName
 
                 MarkdownParser.parse(lines)
                     .filter { !it.isDone }
@@ -110,8 +110,8 @@ class DailyFocusViewModel(
                         tasks.add(
                             DailyFocusTask(
                                 todo = todo,
-                                categoryUri = category.uri,
-                                categoryName = category.displayName,
+                                listUri = list.uri,
+                                listName = list.displayName,
                             ),
                         )
                     }
@@ -121,7 +121,7 @@ class DailyFocusViewModel(
                 isLoading = false,
                 tasks = sortTasks(tasks),
                 lineCache = lineCache,
-                categoryNames = categoryNames,
+                listNames = listNames,
             )
         }
     }
@@ -140,14 +140,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.listUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.categoryUri, newLines)
+                val write = fileRepository.writeLines(task.listUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.listUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -182,14 +182,14 @@ class DailyFocusViewModel(
                 updated
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.listUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.categoryUri, newLines)
+                val write = fileRepository.writeLines(task.listUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.listUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -209,14 +209,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.listUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.categoryUri, newLines)
+                val write = fileRepository.writeLines(task.listUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.listUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -231,13 +231,13 @@ class DailyFocusViewModel(
     }
 
     private fun currentLinesFor(task: DailyFocusTask): List<String> =
-        _uiState.value.lineCache[task.categoryUri.toString()] ?: emptyList()
+        _uiState.value.lineCache[task.listUri.toString()] ?: emptyList()
 
     // Replicates the logic from refreshFromDisk but only for a single file, used for optimistic updates after mutations.
-    private fun applyLines(categoryUri: Uri, newLines: List<String>) {
+    private fun applyLines(listUri: Uri, newLines: List<String>) {
         val today = LocalDate.now().toString()
         val current = _uiState.value
-        val uriKey = categoryUri.toString()
+        val uriKey = listUri.toString()
 
         // Rebuild the cache with the updated file's lines.
         val newCache = current.lineCache.toMutableMap()
@@ -246,7 +246,7 @@ class DailyFocusViewModel(
         val tasks = mutableListOf<DailyFocusTask>()
         for ((uriString, lines) in newCache) {
             val uri = uriString.toUri()
-            val categoryName = current.categoryNames[uriString] ?: continue
+            val listName = current.listNames[uriString] ?: continue
 
             MarkdownParser.parse(lines)
                 .filter { !it.isDone }
@@ -255,8 +255,8 @@ class DailyFocusViewModel(
                     tasks.add(
                         DailyFocusTask(
                             todo = todo,
-                            categoryUri = uri,
-                            categoryName = categoryName,
+                            listUri = uri,
+                            listName = listName,
                         ),
                     )
                 }
@@ -287,13 +287,13 @@ private fun matchesFocusMode(todo: Todo, mode: DailyFocusMode, today: String): B
     }
 }
 
-// Sort: due date earliest -> highest priority -> category name -> line index.
+// Sort: due date earliest -> highest priority -> list name -> line index.
 private fun sortTasks(tasks: List<DailyFocusTask>): List<DailyFocusTask> {
     return tasks.sortedWith(
         compareBy<DailyFocusTask> { it.todo.dueDate == null }
             .thenBy { it.todo.dueDate ?: "" }
             .thenByDescending { it.todo.priority.priorityRank() }
-            .thenBy { it.categoryName.lowercase() }
+            .thenBy { it.listName.lowercase() }
             .thenBy { it.todo.lineIndex },
     )
 }

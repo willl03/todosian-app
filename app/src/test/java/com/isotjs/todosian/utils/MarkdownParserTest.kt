@@ -6,6 +6,51 @@ import java.time.LocalDate
 
 class MarkdownParserTest {
     @Test
+    fun `todo ids are stable across re-parses of unchanged content`() {
+        val lines = listOf(
+            "- [ ] First",
+            "- [x] Second",
+        )
+
+        val first = MarkdownParser.parse(lines).map { it.id }
+        val second = MarkdownParser.parse(lines).map { it.id }
+
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun `toggling a todo keeps its id`() {
+        val lines = listOf("- [ ] First", "- [ ] Second")
+        val before = MarkdownParser.parse(lines).single { it.text == "First" }.id
+
+        val toggled = MarkdownParser.toggleLine(lines, lineIndex = 0, enableTasksPlugin = false)
+        val after = MarkdownParser.parse(toggled).single { it.text == "First" }.id
+
+        assertEquals(before, after)
+    }
+
+    @Test
+    fun `editing a todo re-keys only that todo`() {
+        val lines = listOf("- [ ] First", "- [ ] Second")
+        val idsBefore = MarkdownParser.parse(lines).map { it.id }
+
+        val edited = MarkdownParser.tryEditTodoText(lines, lineIndex = 0, newText = "Renamed")!!
+        val todosAfter = MarkdownParser.parse(edited)
+
+        assertEquals("Renamed", todosAfter[0].text)
+        assertEquals(idsBefore[1], todosAfter[1].id)
+    }
+
+    @Test
+    fun `todo ids are unique within a parse`() {
+        val lines = listOf("- [ ] Same text", "- [ ] Same text", "- [ ] Same text")
+
+        val ids = MarkdownParser.parse(lines).map { it.id }
+
+        assertEquals(3, ids.toSet().size)
+    }
+
+    @Test
     fun parse_ignores_non_todo_lines_and_preserves_line_index() {
         val lines = listOf(
             "# Header",

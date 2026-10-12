@@ -282,9 +282,9 @@ fun DailyFocusScreen(
             return@Scaffold
         }
 
-        // Group tasks by category name
+        // Group tasks by list name
         val grouped = remember(uiState.tasks) {
-            uiState.tasks.groupBy { it.categoryName }
+            uiState.tasks.groupBy { it.listName }
         }
 
         LazyColumn(
@@ -293,13 +293,13 @@ fun DailyFocusScreen(
                 .padding(padding)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
         ) {
-            grouped.forEach { (categoryName, tasksInGroup) ->
-                stickyHeader(key = "header_$categoryName") {
-                    TodosianSectionHeader(text = categoryName)
+            grouped.forEach { (listName, tasksInGroup) ->
+                stickyHeader(key = "header_$listName") {
+                    TodosianSectionHeader(text = listName)
                 }
                 items(
                     items = tasksInGroup,
-                    key = { "${it.categoryUri}:${it.todo.id}" },
+                    key = { "${it.listUri}:${it.todo.id}" },
                 ) { task ->
                     TodoRow(
                         todo = task.todo,
@@ -326,9 +326,9 @@ fun DailyFocusScreen(
                         allowMove = false,
                         showSubtaskButton = false,
                         modifier = Modifier.animateItem(
-                            fadeInSpec = tween(durationMillis = 180),
+                            fadeInSpec = null,
                             placementSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                            fadeOutSpec = tween(durationMillis = 160),
+                            fadeOutSpec = null,
                         ),
                     )
                     Spacer(modifier = Modifier.height(8.dp))

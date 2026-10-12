@@ -16,7 +16,6 @@ interface AppSettingsRepository {
 
     fun setShowDailyFocus(enabled: Boolean)
     fun setDailyFocusMode(mode: DailyFocusMode)
-    fun setCategorySort(sort: CategorySort)
     fun setTodoGrouping(grouping: TodoGrouping)
     fun setTodoSort(sort: TodoSort)
     fun setNewTodoFilePosition(position: NewTodoFilePosition)
@@ -69,10 +68,6 @@ class SharedPrefsAppSettingsRepository(
         prefs.edit { putString(KEY_DAILY_FOCUS_MODE, mode.name) }
     }
 
-    override fun setCategorySort(sort: CategorySort) {
-        prefs.edit { putString(KEY_CATEGORY_SORT, sort.name) }
-    }
-
     override fun setTodoGrouping(grouping: TodoGrouping) {
         prefs.edit { putString(KEY_TODO_GROUPING, grouping.name) }
     }
@@ -109,10 +104,6 @@ class SharedPrefsAppSettingsRepository(
             runCatching { ThemeMode.valueOf(raw) }.getOrNull()
         } ?: ThemeMode.SYSTEM
 
-        val categorySort = prefs.getString(KEY_CATEGORY_SORT, null)?.let { raw ->
-            runCatching { CategorySort.valueOf(raw) }.getOrNull()
-        } ?: CategorySort.A_Z
-
         val todoGrouping = prefs.getString(KEY_TODO_GROUPING, null)?.let { raw ->
             runCatching { TodoGrouping.valueOf(raw) }.getOrNull()
         } ?: TodoGrouping.GROUPED
@@ -132,7 +123,6 @@ class SharedPrefsAppSettingsRepository(
             dailyFocusMode = prefs.getString(KEY_DAILY_FOCUS_MODE, null)?.let { raw ->
                 runCatching { DailyFocusMode.valueOf(raw) }.getOrNull()
             } ?: DailyFocusMode.TODAY,
-            categorySort = categorySort,
             todoGrouping = todoGrouping,
             todoSort = todoSort,
             newTodoFilePosition = newTodoFilePosition,
@@ -151,7 +141,6 @@ class SharedPrefsAppSettingsRepository(
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_SHOW_DAILY_FOCUS = "show_daily_focus"
         private const val KEY_DAILY_FOCUS_MODE = "daily_focus_mode"
-        private const val KEY_CATEGORY_SORT = "category_sort"
         private const val KEY_TODO_GROUPING = "todo_grouping"
         private const val KEY_TODO_SORT = "todo_sort"
         private const val KEY_NEW_TODO_FILE_POSITION = "new_todo_file_position"

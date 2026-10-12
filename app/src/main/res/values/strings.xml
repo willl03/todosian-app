@@ -24,21 +24,58 @@
         <item quantity="one">%1$d task due today or overdue</item>
         <item quantity="other">%1$d tasks due today or overdue</item>
     </plurals>
-    <string name="home_empty_title">No categories yet</string>
-    <string name="home_empty_subtitle">Create a category or choose a different folder.</string>
-    <string name="home_create_category">Create category</string>
-    <string name="home_new_category_title">New category</string>
-    <string name="home_new_category_hint">Category name</string>
-    <string name="home_category_action_rename">Rename</string>
-    <string name="home_category_action_delete">Delete</string>
-    <string name="home_rename_category_title">Rename category</string>
-    <string name="home_rename_category_hint">New name</string>
-    <string name="home_rename_category_error_empty">Name can’t be empty.</string>
-    <string name="home_rename_category_error_invalid_chars">Name contains invalid characters.</string>
-    <string name="home_rename_category_error_sync_conflict">Name must not contain "sync-conflict".</string>
-    <string name="home_delete_category_title">Delete category?</string>
-    <string name="home_delete_category_body">This will delete the markdown file from your selected folder.</string>
-    <string name="home_delete_category_confirm">Delete</string>
+    <string name="home_empty_title">No folders yet</string>
+    <string name="home_empty_subtitle">Create a folder or choose a different folder.</string>
+    <string name="home_create_folder">Create folder</string>
+    <string name="home_new_folder_title">New folder</string>
+    <string name="home_new_folder_hint">Folder name</string>
+    <string name="home_unfiled_title">Unfiled lists</string>
+    <string name="home_folder_lists_empty">No lists yet</string>
+    <string name="home_folder_action_rename">Rename</string>
+    <string name="home_folder_action_delete">Delete</string>
+    <string name="home_folder_action_color">Color</string>
+    <string name="folder_color_title">Folder color</string>
+    <string name="folder_color_none">None</string>
+    <string name="home_folder_action_move_up">Move up</string>
+    <string name="home_folder_action_move_down">Move down</string>
+    <string name="home_rename_folder_title">Rename folder</string>
+    <string name="home_rename_folder_hint">New name</string>
+    <string name="home_rename_folder_error_empty">Name can’t be empty.</string>
+    <string name="home_rename_folder_error_invalid_chars">Name contains invalid characters.</string>
+    <string name="home_rename_folder_error_sync_conflict">Name must not contain "sync-conflict".</string>
+    <string name="home_delete_folder_title">Delete folder?</string>
+    <string name="home_delete_folder_body">This deletes the folder and every list inside it from your storage.</string>
+    <string name="home_delete_folder_confirm">Delete</string>
+
+    <!-- Folder (lists inside a folder, incl. the unfiled pseudo-folder) -->
+    <string name="folder_empty_title">No lists yet</string>
+    <string name="folder_empty_subtitle">Add a list to get started.</string>
+    <string name="folder_new_list_title">New list</string>
+    <string name="folder_new_list_hint">List name</string>
+    <string name="folder_rename_list_title">Rename list</string>
+    <string name="folder_rename_list_hint">New name</string>
+    <string name="folder_delete_list_title">Delete list?</string>
+    <string name="folder_delete_list_body">This will delete the markdown file from your folder.</string>
+    <string name="folder_delete_list_confirm">Delete</string>
+    <string name="folder_list_action_rename">Rename</string>
+    <string name="folder_list_action_move">Move to another folder</string>
+    <string name="folder_list_action_delete">Delete</string>
+    <string name="folder_list_counts_placeholder">…</string>
+    <string name="folder_list_action_move_up">Move up</string>
+    <string name="folder_list_action_move_down">Move down</string>
+    <string name="folder_move_list_title">Move list</string>
+    <string name="folder_move_list_body">Choose a folder to move this list to.</string>
+    <string name="folder_move_list_empty">No other folders available.</string>
+    <string name="folder_move_list_success">List moved.</string>
+
+    <!-- Folder pager -->
+    <string name="folder_unavailable_title">Folder unavailable</string>
+    <string name="folder_unavailable_subtitle">This folder was deleted or renamed.</string>
+
+    <!-- List pager -->
+    <string name="list_unavailable_title">List unavailable</string>
+    <string name="list_unavailable_subtitle">This list was moved or deleted.</string>
+    <string name="page_indicator" translatable="false">%1$d/%2$d</string>
 
     <!-- Category -->
     <string name="category_empty_title">No todos yet</string>
@@ -56,8 +93,8 @@
     <string name="category_delete_todo_body_with_subtasks">This action removes the todo and its subtasks from the markdown file.</string>
     <string name="category_delete_todo_confirm">Delete</string>
     <string name="category_move_title">Move todo</string>
-    <string name="category_move_body">Choose a category to move this todo to.</string>
-    <string name="category_move_empty">No other categories available.</string>
+    <string name="category_move_body">Choose a list to move this todo to.</string>
+    <string name="category_move_empty">No other lists available.</string>
     <string name="category_copy_show">Show copy options</string>
     <string name="category_copy_hide">Hide copy options</string>
     <string name="category_move_success">Todo moved.</string>
@@ -116,7 +153,8 @@
     <!-- Content descriptions -->
     <string name="cd_open_settings">Open settings</string>
     <string name="cd_overflow_menu">More options</string>
-    <string name="cd_add_category">Add category</string>
+    <string name="cd_add_folder">Add folder</string>
+    <string name="cd_add_list">Add list</string>
     <string name="cd_add_todo">Add todo</string>
     <string name="cd_add_subtask">Add subtask</string>
     <string name="cd_navigate_back">Navigate back</string>
@@ -127,6 +165,7 @@
     <string name="error_folder_invalid">Could not access the selected folder.</string>
     <string name="error_read_failed">Could not read the file.</string>
     <string name="error_write_failed">Could not save your changes.</string>
+    <string name="error_reorder_failed">Couldn’t save the new order.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -171,15 +210,13 @@
     <string name="settings_daily_focus_mode_today">Today</string>
     <string name="settings_daily_focus_mode_overdue">Overdue</string>
     <string name="settings_daily_focus_mode_today_overdue">Today and overdue</string>
-    <string name="settings_category_sort">Category sorting</string>
-    <string name="settings_sort_az">A–Z</string>
-    <string name="settings_sort_remaining">Most remaining</string>
     <string name="settings_todo_grouping">Todo ordering</string>
     <string name="settings_grouping_grouped">Grouped (Active/Completed)</string>
     <string name="settings_grouping_file_order">File order</string>
     <string name="settings_todo_sort">Todo sorting</string>
     <string name="settings_todo_sort_file_order">File order</string>
     <string name="settings_todo_sort_priority_desc">Priority (high to low)</string>
+    <string name="settings_todo_sort_due_priority">Due date + priority</string>
     <string name="settings_todo_sort_created_newest">Created date (newest first)</string>
     <string name="settings_todo_sort_due_earliest">Due date (earliest first)</string>
     <string name="settings_new_todo_file_position">Add new todos</string>
@@ -245,16 +282,20 @@
     <string name="widget_add_task">Add task</string>
     <string name="widget_refresh">Refresh tasks</string>
     <string name="widget_add_task_name">Add task</string>
-    <string name="widget_add_task_description">Quickly add a task to any of your categories.</string>
+    <string name="widget_add_task_description">Quickly add a task to any of your lists.</string>
     <string name="widget_title_all_lists">All lists</string>
     <string name="widget_configure_title">Select a list for this widget</string>
-    <string name="widget_configure_all_lists_hint">Shows tasks from every note</string>
+    <string name="widget_configure_all_lists_hint">Shows tasks from every list</string>
     <string name="widget_configure_show_completed">Show completed tasks</string>
     <string name="widget_missing_list">List unavailable. Long-press the widget and choose Edit to pick another.</string>
+    <plurals name="widget_configure_task_count">
+        <item quantity="one">%1$d task</item>
+        <item quantity="other">%1$d tasks</item>
+    </plurals>
 
     <!-- Add task flow -->
     <string name="add_task_picker_title">Add task</string>
-    <string name="add_task_picker_subtitle">Choose a category to add the task to</string>
-    <string name="add_task_picker_empty_title">No categories found</string>
-    <string name="add_task_picker_empty_subtitle">Open Todosian and create a category first.</string>
+    <string name="add_task_picker_subtitle">Choose a list to add the task to</string>
+    <string name="add_task_picker_empty_title">No lists found</string>
+    <string name="add_task_picker_empty_subtitle">Open Todosian and create a list first.</string>
 </resources>
