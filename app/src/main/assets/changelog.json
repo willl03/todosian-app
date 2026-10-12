@@ -1,7 +1,43 @@
 [
   {
-    "versionCode": 10,
-    "versionName": "2.2",
+    "versionCode": 10001,
+    "versionName": "2.2.0+fork.1",
+    "items": [
+      {
+        "icon": "SubdirectoryArrowRight",
+        "title": "Folders",
+        "description": "Organize your lists into folders with emoji badges and colors, alongside the unfiled lists at the top level."
+      },
+      {
+        "icon": "SwapVert",
+        "title": "Manual Ordering",
+        "description": "Drag and drop to arrange folders and lists in any order; your custom order is kept across restarts and syncs."
+      },
+      {
+        "icon": "Widgets",
+        "title": "Folder-Aware Widgets",
+        "description": "The widget picker mirrors the folder structure, task rows show their priority, and widgets no longer repeat the list name under every entry."
+      },
+      {
+        "icon": "Checklist",
+        "title": "Show or Hide Completed",
+        "description": "A quick toggle in every list's menu shows or hides completed tasks without leaving the screen."
+      },
+      {
+        "icon": "AutoAwesome",
+        "title": "Polished Details",
+        "description": "New entries start with a capital letter, and the list pager lets you swipe between the lists of a folder."
+      },
+      {
+        "icon": "Security",
+        "title": "Merged Upstream Updates",
+        "description": "Synced with upstream: safer note links opened from external intents and widgets, plus updated libraries."
+      }
+    ]
+  },
+  {
+    "versionCode": 10001,
+    "versionName": "2.2.0+fork.1",
     "items": [
       {
         "icon": "Palette",

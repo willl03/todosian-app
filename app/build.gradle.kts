@@ -18,8 +18,10 @@ android {
         applicationId = "com.isotjs.todosian"
         minSdk = 30
         targetSdk = 37
-        versionCode = 10
-        versionName = "2.2"
+        // Fork versioning: versionCode = <upstream code> * 1000 + <fork build>;
+        // versionName = "<upstream version>+fork.<build>".
+        versionCode = 10001
+        versionName = "2.2.0+fork.1"
     }
 
     val keystoreProperties = Properties().apply {

@@ -6,6 +6,8 @@
   <a href="https://github.com/isotjs/todosian-app/releases"><img src="https://img.shields.io/github/downloads/isotjs/todosian-app/total?color=8B5CF6" alt="Downloads"></a>
 </p>
 
+> **✨ This is my personal fork** of [isotjs/todosian-app](https://github.com/isotjs/todosian-app), with extra features on top: folders that group your lists (with emoji badges, colors, and manual drag-and-drop ordering), a swipeable list pager, folder-aware widgets, and more. Versions are marked as `upstream+fork.N` (for example `2.2.0+fork.1`). Everything below this notice is the upstream readme.
+
 Todosian is an Android app for managing todo lists stored as Markdown files inside your Obsidian vault.
 
 It is designed to work with a folder that is synced to your phone (for example via Syncthing). The app reads and writes the Markdown files directly; it does not import your data into a database.

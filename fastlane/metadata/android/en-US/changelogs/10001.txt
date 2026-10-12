@@ -1,0 +1,13 @@
+First fork release, based on upstream 2.2.
+
+New Features:
+• Folders - organize your lists into folders with emoji badges and colors; unfiled lists stay at the top level
+• Manual ordering - drag and drop to arrange folders and lists in any order
+• Folder-aware widgets - the widget picker mirrors the folder structure, and task rows show their priority
+• Show or hide completed tasks from every list's menu
+• New entries start with a capital letter
+• List pager - swipe between the lists of a folder
+
+Improvements:
+• Widget task rows no longer repeat the list name when a widget is bound to a single list
+• Synced with upstream: safer note links opened from external intents and widgets, plus updated libraries
