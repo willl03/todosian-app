@@ -79,6 +79,7 @@ class TodosianWidget : GlanceAppWidget() {
                     selectedCategoryUri = snapshot?.selectedCategoryUri,
                     missingList = snapshot?.missingList ?: false,
                     isFolderBound = snapshot?.isFolderBound ?: false,
+                    selectedFolderUri = snapshot?.selectedFolderUri,
                 )
             }
         }
@@ -93,6 +94,7 @@ class TodosianWidget : GlanceAppWidget() {
         selectedCategoryUri: String?,
         missingList: Boolean,
         isFolderBound: Boolean,
+        selectedFolderUri: String?,
     ) {
         val context = LocalContext.current
         val openAppAction = actionStartActivity(
@@ -100,13 +102,16 @@ class TodosianWidget : GlanceAppWidget() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
         )
-        // A widget bound to a single note routes "+" straight into that note; unbound widgets
-        // open the regular "pick a note" flow.
+        // The "+" button follows the widget's binding: a bound list routes straight into that
+        // list's add sheet, a bound folder opens the picker scoped to that folder's lists, and
+        // an unbound widget opens the full vault picker.
         val openAddTaskAction = actionStartActivity(
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 if (selectedCategoryUri != null) {
                     putExtra(MainActivity.EXTRA_OPEN_ADD_TASK_CATEGORY, selectedCategoryUri)
+                } else if (selectedFolderUri != null) {
+                    putExtra(MainActivity.EXTRA_OPEN_ADD_TASK_FOLDER, selectedFolderUri)
                 } else {
                     putExtra(MainActivity.EXTRA_OPEN_ADD_TASK, true)
                 }

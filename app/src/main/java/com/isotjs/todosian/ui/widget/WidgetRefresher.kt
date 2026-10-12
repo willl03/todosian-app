@@ -189,6 +189,8 @@ internal data class WidgetSnapshot(
     val selectedCategoryUri: String? = null,
     val missingList: Boolean = false,
     val isFolderBound: Boolean = false,
+    /** Folder-bound widgets: the resolved folder URI, routing "+" into a scoped picker. */
+    val selectedFolderUri: String? = null,
 ) {
     /**
      * Writes all snapshot keys into [prefs], first removing the item keys of any previous
@@ -218,6 +220,8 @@ internal data class WidgetSnapshot(
         else prefs.remove(SELECTED_URI_KEY)
         prefs[MISSING_LIST_KEY] = missingList
         prefs[KEY_IS_FOLDER_BOUND] = isFolderBound
+        if (selectedFolderUri != null) prefs[SELECTED_FOLDER_URI_KEY] = selectedFolderUri
+        else prefs.remove(SELECTED_FOLDER_URI_KEY)
         items.forEachIndexed { index, item ->
             val prefix = "$ITEM_KEY_PREFIX$index."
             prefs[stringPreferencesKey("${prefix}category_uri")] = item.categoryUri
@@ -237,6 +241,7 @@ internal data class WidgetSnapshot(
         private val TITLE_KEY = stringPreferencesKey("widget_title")
         private val SELECTED_URI_KEY = stringPreferencesKey("widget_selected_category_uri")
         private val MISSING_LIST_KEY = booleanPreferencesKey("widget_missing_list")
+        private val SELECTED_FOLDER_URI_KEY = stringPreferencesKey("widget_selected_folder_uri")
 
         /** Returns null when no snapshot was written yet (e.g. a freshly placed widget). */
         fun fromPreferences(prefs: Preferences): WidgetSnapshot? {
@@ -275,6 +280,7 @@ internal data class WidgetSnapshot(
                 selectedCategoryUri = prefs[SELECTED_URI_KEY],
                 missingList = prefs[MISSING_LIST_KEY] ?: false,
                 isFolderBound = prefs[KEY_IS_FOLDER_BOUND] ?: false,
+                selectedFolderUri = prefs[SELECTED_FOLDER_URI_KEY],
             )
         }
     }
@@ -454,6 +460,7 @@ object WidgetRefresher {
                 isFolderBound = true,
                 showCompleted = showCompleted,
                 priorityLabels = priorityLabels,
+                selectedFolderUri = resolvedFolder.uri.toString(),
             )
         }
 
@@ -483,6 +490,7 @@ object WidgetRefresher {
             isFolderBound = false,
             showCompleted = showCompleted,
             priorityLabels = priorityLabels,
+            selectedFolderUri = null,
         )
     }
 
@@ -500,6 +508,7 @@ object WidgetRefresher {
         isFolderBound: Boolean,
         showCompleted: Boolean,
         priorityLabels: Map<TasksPriority, String>,
+        selectedFolderUri: String? = null,
     ): WidgetSnapshot {
         val taskItems = scopedCategories.flatMap { category ->
             val lines = linesByUri[category.uri].orEmpty()
@@ -540,6 +549,7 @@ object WidgetRefresher {
             selectedCategoryUri = selectedCategoryUri,
             missingList = false,
             isFolderBound = isFolderBound,
+            selectedFolderUri = selectedFolderUri,
         )
     }
 }
