@@ -130,7 +130,6 @@ fun DailyFocusScreen(
         ) {
             val scrollState = rememberScrollState()
             val todoTextBringIntoView = remember { BringIntoViewRequester() }
-            val recurrenceBringIntoView = remember { BringIntoViewRequester() }
 
             Column(
                 modifier = Modifier
@@ -167,13 +166,6 @@ fun DailyFocusScreen(
                         meta = sheetMeta,
                         onMetaChange = { sheetMeta = it },
                         useEmojisInUi = settings.tasksPluginUseEmojisInUi,
-                        modifier = Modifier
-                            .bringIntoViewRequester(recurrenceBringIntoView)
-                            .onFocusEvent { focusState ->
-                                if (focusState.isFocused) {
-                                    scope.launch { recurrenceBringIntoView.bringIntoView() }
-                                }
-                            },
                     )
                 }
 

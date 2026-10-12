@@ -215,7 +215,6 @@ fun CategoryScreen(
         ) {
             val scrollState = rememberScrollState()
             val todoTextBringIntoView = remember { BringIntoViewRequester() }
-            val recurrenceBringIntoView = remember { BringIntoViewRequester() }
             val titleRes = when (sheetMode) {
                 TodoSheetMode.Add -> R.string.category_add_todo_title
                 is TodoSheetMode.Edit -> R.string.category_edit_todo_title
@@ -266,13 +265,6 @@ fun CategoryScreen(
                         meta = sheetMeta,
                         onMetaChange = { sheetMeta = it },
                         useEmojisInUi = settings.tasksPluginUseEmojisInUi,
-                        modifier = Modifier
-                            .bringIntoViewRequester(recurrenceBringIntoView)
-                            .onFocusEvent { focusState ->
-                                if (focusState.isFocused) {
-                                    scope.launch { recurrenceBringIntoView.bringIntoView() }
-                                }
-                            },
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))

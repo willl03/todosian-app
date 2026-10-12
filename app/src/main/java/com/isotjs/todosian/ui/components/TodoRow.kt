@@ -286,24 +286,6 @@ fun TasksMetaEditor(
             value = meta.priority,
             onChange = { onMetaChange(meta.copy(priority = it)) },
         )
-
-        OutlinedTextField(
-            value = meta.recurrence.orEmpty(),
-            onValueChange = { value ->
-                onMetaChange(meta.copy(recurrence = value.ifBlank { null }))
-            },
-            singleLine = true,
-            label = {
-                Text(
-                    text = if (useEmojisInUi) {
-                        stringResource(R.string.category_tasks_recurrence)
-                    } else {
-                        stringResource(R.string.category_tasks_recurrence_label)
-                    },
-                )
-            },
-            modifier = modifier.fillMaxWidth(),
-        )
     }
 }
 
@@ -544,14 +526,8 @@ internal fun buildTasksMetaChips(
         chips.add(TasksMetaChipUi(label = label, icon = if (useEmojisInUi) null else Icons.Outlined.CheckCircle))
     }
 
-    if (!todo.recurrence.isNullOrBlank()) {
-        val label = if (useEmojisInUi) {
-            stringResource(R.string.category_tasks_chip_recurrence, todo.recurrence)
-        } else {
-            stringResource(R.string.category_tasks_chip_recurrence_label, todo.recurrence)
-        }
-        chips.add(TasksMetaChipUi(label = label, icon = if (useEmojisInUi) null else Icons.Outlined.Repeat))
-    }
+    // Recurrence is deliberately not shown (nor editable in the sheet): the 🔁 token stays
+    // supported in the files for Obsidian Tasks compatibility, managed in Obsidian itself.
 
     return chips.filter { it.label.isNotBlank() }
 }
