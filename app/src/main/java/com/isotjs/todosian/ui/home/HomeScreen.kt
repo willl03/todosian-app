@@ -88,6 +88,7 @@ import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.ListPagerSeed
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
+import com.isotjs.todosian.ui.components.FolderColorPalette
 import com.isotjs.todosian.ui.components.FolderColorPickerSheet
 import com.isotjs.todosian.ui.components.pickedColorToName
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
@@ -171,6 +172,7 @@ fun HomeScreen(
 
     var showNewFolderSheet by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
+    var newFolderColor by remember { mutableStateOf<String?>(null) }
 
     var renameTarget by remember { mutableStateOf<Folder?>(null) }
     var renameValue by remember { mutableStateOf("") }
@@ -208,7 +210,13 @@ fun HomeScreen(
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                FolderColorPalette(
+                    current = newFolderColor,
+                    onPick = { newFolderColor = it },
+                    swatchSize = 36.dp,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.fillMaxWidth(),
@@ -219,6 +227,7 @@ fun HomeScreen(
                                 newFolderSheetState.hide()
                                 showNewFolderSheet = false
                                 newFolderName = ""
+                                newFolderColor = null
                             }
                         },
                     ) {
@@ -226,11 +235,16 @@ fun HomeScreen(
                     }
                     TextButton(
                         onClick = {
-                            viewModel.createFolder(newFolderName)
+                            // The chosen color emoji becomes the folder name's leading emoji,
+                            // exactly like the color sheet for existing folders.
+                            val finalName = pickedColorToName(newFolderName.trim(), newFolderColor)
+                                ?: newFolderName.trim()
+                            viewModel.createFolder(finalName)
                             scope.launch {
                                 newFolderSheetState.hide()
                                 showNewFolderSheet = false
                                 newFolderName = ""
+                                newFolderColor = null
                             }
                         },
                         enabled = newFolderName.trim().isNotEmpty(),

@@ -38,6 +38,83 @@ import com.isotjs.todosian.utils.withLeadingEmoji
 val FOLDER_COLOR_EMOJIS = listOf("🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪")
 
 /**
+ * The color palette body: emoji swatches plus a "None" option, shared by the folder color
+ * sheet and the new-folder dialog. [current] is the selected emoji (null = none);
+ * [swatchSize] shrinks the swatches for tighter layouts.
+ */
+@Composable
+fun FolderColorPalette(
+    current: String?,
+    onPick: (emoji: String?) -> Unit,
+    swatchSize: androidx.compose.ui.unit.Dp = 52.dp,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        FOLDER_COLOR_EMOJIS.chunked(5).forEach { rowEmojis ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowEmojis.forEach { emoji ->
+                    val selected = emoji == current
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(swatchSize)
+                            .background(
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                },
+                                shape = CircleShape,
+                            )
+                            .border(
+                                width = if (selected) 2.dp else 0.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape,
+                            )
+                            .clickable { onPick(emoji) },
+                    ) {
+                        Text(text = emoji, fontSize = (swatchSize.value / 2).sp)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        val noneSelected = current == null
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .clickable { onPick(null) }
+                .padding(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Block,
+                contentDescription = null,
+                tint = if (noneSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                text = stringResource(R.string.folder_color_none),
+                textAlign = TextAlign.Center,
+                style = if (noneSelected) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+    }
+}
+
+/**
  * Emoji color picker for a folder: a palette plus a "None" option. The current emoji
  * (the leading emoji of [folderName]) is highlighted. [onPick] receives the chosen emoji,
  * or null for "None" — the caller turns that into the folder's new name via a rename.
@@ -69,63 +146,10 @@ fun FolderColorPickerSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             val current = remember(folderName) { leadingEmoji(folderName) }
-            FOLDER_COLOR_EMOJIS.chunked(5).forEach { rowEmojis ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowEmojis.forEach { emoji ->
-                        val selected = emoji == current
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(52.dp)
-                                .background(
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHigh
-                                    },
-                                    shape = CircleShape,
-                                )
-                                .border(
-                                    width = if (selected) 2.dp else 0.dp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape,
-                                )
-                                .clickable { onPick(emoji) },
-                        ) {
-                            Text(text = emoji, fontSize = 26.sp)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            val noneSelected = current == null
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .clickable { onPick(null) }
-                    .padding(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Block,
-                    contentDescription = null,
-                    tint = if (noneSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-                Text(
-                    text = stringResource(R.string.folder_color_none),
-                    textAlign = TextAlign.Center,
-                    style = if (noneSelected) {
-                        MaterialTheme.typography.titleMedium
-                    } else {
-                        MaterialTheme.typography.bodyMedium
-                    },
-                )
-            }
+            FolderColorPalette(
+                current = current,
+                onPick = onPick,
+            )
             Spacer(modifier = Modifier.width(4.dp))
         }
     }
