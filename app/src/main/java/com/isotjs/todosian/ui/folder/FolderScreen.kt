@@ -93,6 +93,7 @@ import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.ListPagerSeed
 import com.isotjs.todosian.ui.components.FolderColorPickerSheet
+import com.isotjs.todosian.ui.components.FolderMenuItems
 import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.pickedColorToName
 import com.isotjs.todosian.ui.components.validateFolderName
@@ -1028,27 +1029,14 @@ private fun FolderPage(
                                 expanded = folderMenuExpanded,
                                 onDismissRequest = { folderMenuExpanded = false },
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.home_folder_action_rename)) },
-                                    onClick = {
-                                        folderMenuExpanded = false
+                                FolderMenuItems(
+                                    onRename = {
                                         renameFolderValue = uiState.folderName
                                         showRenameFolderSheet = true
                                     },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.home_folder_action_color)) },
-                                    onClick = {
-                                        folderMenuExpanded = false
-                                        showColorPicker = true
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.home_folder_action_delete)) },
-                                    onClick = {
-                                        folderMenuExpanded = false
-                                        showDeleteFolderDialog = true
-                                    },
+                                    onPickColor = { showColorPicker = true },
+                                    onDelete = { showDeleteFolderDialog = true },
+                                    onDismiss = { folderMenuExpanded = false },
                                 )
                             }
                         }

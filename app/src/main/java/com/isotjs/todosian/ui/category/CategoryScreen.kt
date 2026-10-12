@@ -29,6 +29,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Unarchive
@@ -705,6 +708,9 @@ fun CategoryScreen(
                         // Show/hide completed lives in the bottom-left toggle button now.
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.folder_list_action_rename)) },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Outlined.Edit, contentDescription = null)
+                            },
                             onClick = {
                                 listMenuExpanded = false
                                 renameListValue = uiState.title
@@ -713,6 +719,9 @@ fun CategoryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.folder_list_action_move)) },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Outlined.DriveFileMove, contentDescription = null)
+                            },
                             onClick = {
                                 listMenuExpanded = false
                                 showMoveListSheet = true
@@ -720,6 +729,9 @@ fun CategoryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.folder_list_action_delete)) },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Outlined.Delete, contentDescription = null)
+                            },
                             onClick = {
                                 listMenuExpanded = false
                                 showDeleteListDialog = true
