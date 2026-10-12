@@ -83,7 +83,7 @@ class DailyFocusViewModel(
             }
 
             val today = LocalDate.now().toString()
-            val listsResult = fileRepository.getAllLists()
+            val listsResult = fileRepository.getAllLists(includeCounts = false)
             if (listsResult.isFailure) {
                 _uiState.value = DailyFocusUiState(isLoading = false)
                 return@launch

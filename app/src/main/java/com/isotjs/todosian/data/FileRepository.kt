@@ -37,15 +37,19 @@ interface FileRepository {
 
     suspend fun persistFolderUri(uri: Uri): Result<Unit>
 
-    /** Full vault layout: real folders (A–Z) plus the root-level "Unfiled lists" pseudo-folder. */
-    suspend fun getVaultContent(): Result<VaultContent>
+    /**
+     * Full vault layout: real folders plus the root-level "Unfiled lists" pseudo-folder.
+     * With [includeCounts] = false the todo counts are not computed (files are not read or
+     * parsed at all) — use it wherever the counts are not displayed, e.g. a names-only scan.
+     */
+    suspend fun getVaultContent(includeCounts: Boolean): Result<VaultContent>
 
     /** Every list in the vault, flattened across folders (for widgets, daily focus, pickers). */
-    suspend fun getAllLists(): Result<List<TodoList>>
+    suspend fun getAllLists(includeCounts: Boolean): Result<List<TodoList>>
 
     /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder),
      *  ordered by the manual order file for [parentPath] ("" = unfiled), then A–Z. */
-    suspend fun getListsIn(parentUri: Uri, parentPath: String): Result<List<TodoList>>
+    suspend fun getListsIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<TodoList>>
 
     suspend fun readLines(uri: Uri): Result<List<String>>
 
@@ -186,7 +190,7 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getVaultContent(): Result<VaultContent> {
+    override suspend fun getVaultContent(includeCounts: Boolean): Result<VaultContent> {
         val folderUri = getFolderUri() ?: return Result.success(VaultContent(emptyList(), emptyList()))
         return withContext(Dispatchers.IO) {
             runCatching {
@@ -207,7 +211,7 @@ class SafFileRepository(
                             lists = dir.listFiles()
                                 .asSequence()
                                 .filter { it.isFile }
-                                .mapNotNull { parseListFile(it) }
+                                .mapNotNull { parseListFile(it, includeCounts) }
                                 .toList(),
                         )
                     }
@@ -230,7 +234,7 @@ class SafFileRepository(
 
                 val unfiledLists = children.asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseListFile(it) }
+                    .mapNotNull { parseListFile(it, includeCounts) }
                     .toList()
 
                 VaultContent(
@@ -245,11 +249,11 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getAllLists(): Result<List<TodoList>> {
-        return getVaultContent().mapCatching { it.allLists() }
+    override suspend fun getAllLists(includeCounts: Boolean): Result<List<TodoList>> {
+        return getVaultContent(includeCounts).mapCatching { it.allLists() }
     }
 
-    override suspend fun getListsIn(parentUri: Uri, parentPath: String): Result<List<TodoList>> {
+    override suspend fun getListsIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<TodoList>> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 // Works for both the vault root tree URI and a folder's document URI:
@@ -262,7 +266,7 @@ class SafFileRepository(
                 val lists = parent.listFiles()
                     .asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseListFile(it) }
+                    .mapNotNull { parseListFile(it, includeCounts) }
                     .toList()
 
                 ListOrder.effective(
@@ -274,11 +278,25 @@ class SafFileRepository(
         }
     }
 
-    /** Reads and parses one `.md` document into a [TodoList]; null when it is not a list file. */
-    private fun parseListFile(file: DocumentFile): TodoList? {
+    /**
+     * Reads and parses one `.md` document into a [TodoList]; null when it is not a list file.
+     * With [includeCounts] = false the file is not opened at all and all counts stay 0 —
+     * the names-only scans (home rows, pagers, pickers) get a full-speed pass.
+     */
+    private fun parseListFile(file: DocumentFile, includeCounts: Boolean): TodoList? {
         val name = file.name
         if (!isListFileName(name)) return null
         val displayName = name.orEmpty().removeSuffix(".md")
+        if (!includeCounts) {
+            return TodoList(
+                displayName = displayName,
+                uri = file.uri,
+                todoCount = 0,
+                doneCount = 0,
+                dueTodayCount = 0,
+                overdueCount = 0,
+            )
+        }
         val lines = readLinesInternal(file.uri)
         val todos = MarkdownParser.parse(lines)
         val doneCount = todos.count { it.isDone }

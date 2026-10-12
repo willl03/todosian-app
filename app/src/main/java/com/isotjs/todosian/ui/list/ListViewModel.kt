@@ -119,7 +119,7 @@ class ListViewModel(
 
         _uiState.value = state.copy(isLoadingMoveTargets = true)
         viewModelScope.launch {
-            val targets = fileRepository.getAllLists()
+            val targets = fileRepository.getAllLists(includeCounts = false)
                 .getOrElse { emptyList() }
                 .filterNot { it.uri == listUri }
                 .map { MoveTarget(title = it.displayName, uri = it.uri) }
@@ -161,7 +161,7 @@ class ListViewModel(
         if (state.moveFolderTargets != null) return
 
         viewModelScope.launch {
-            val content = fileRepository.getVaultContent().getOrNull()
+            val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
             val rootUri = fileRepository.getFolderUri()
             val targets = buildList {
                 // Unfiled is a destination for every folder's lists, but not for unfiled itself.

@@ -93,6 +93,7 @@ import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.todosianFabShape
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -134,8 +135,10 @@ fun HomeScreen(
     LaunchedEffect(lifecycleOwner, viewModel) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             // Re-scan on every resume so tasks checked in the widget, edits made in Obsidian,
-            // or sync changes that happened while the app was away are picked up.
-            viewModel.refresh(showLoading = false)
+            // or sync changes that happened while the app was away are picked up. The banner
+            // is the only consumer of todo counts on this screen; skip parsing without it.
+            val showDailyFocus = appSettingsRepository.settings.first().showDailyFocus
+            viewModel.refresh(showLoading = false, includeCounts = showDailyFocus)
         }
     }
 
@@ -157,7 +160,7 @@ fun HomeScreen(
     )
 
     LaunchedEffect(refreshSignal) {
-        if (refreshSignal > 0L) viewModel.refresh()
+        if (refreshSignal > 0L) viewModel.refresh(includeCounts = settings.showDailyFocus)
     }
 
     var showNewFolderSheet by remember { mutableStateOf(false) }
@@ -389,7 +392,7 @@ fun HomeScreen(
             onRefresh = {
                 isRefreshing = true
                 scope.launch {
-                    viewModel.refreshNow(showLoading = false)
+                    viewModel.refreshNow(showLoading = false, includeCounts = settings.showDailyFocus)
                     isRefreshing = false
                 }
             },

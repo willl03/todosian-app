@@ -234,7 +234,7 @@ object WidgetRefresher {
         }
 
         refreshMutex.withLock {
-            val categories = fileRepository.getAllLists().getOrDefault(emptyList())
+            val categories = fileRepository.getAllLists(includeCounts = true).getOrDefault(emptyList())
             val widgetStates = glanceIds.map { glanceId ->
                 runCatching {
                     getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)

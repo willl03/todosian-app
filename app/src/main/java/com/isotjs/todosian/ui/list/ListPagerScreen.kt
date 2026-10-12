@@ -173,7 +173,7 @@ class ListPagerViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            val content = fileRepository.getVaultContent().getOrNull()
+            val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
             val containingFolder = content?.folders?.firstOrNull { folder ->
                 folder.lists.any { it.uri == listUri }
             }

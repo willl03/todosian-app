@@ -150,7 +150,7 @@ class FolderViewModel(
             val folderName = if (isUnfiled) "" else {
                 fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
             }
-            val listsResult = fileRepository.getListsIn(folderUri, folderPath)
+            val listsResult = fileRepository.getListsIn(folderUri, folderPath, includeCounts = true)
 
             _uiState.value = FolderUiState(
                 isLoading = false,
@@ -202,7 +202,7 @@ class FolderViewModel(
         if (state.moveFolderTargets != null) return
 
         viewModelScope.launch {
-            val content = fileRepository.getVaultContent().getOrNull()
+            val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
             val targets = buildList {
                 if (!isUnfiled && content?.unfiledLists?.isNotEmpty() == true) {
                     add(
@@ -350,7 +350,7 @@ class FolderPagerViewModel(
     }
 
     private suspend fun scanPages() {
-        val content = fileRepository.getVaultContent().getOrNull()
+        val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
         val rootUri = fileRepository.getFolderUri()
         if (content == null || rootUri == null) {
             _uiState.value = FolderPagerUiState(isLoading = false)

@@ -49,7 +49,7 @@ fun AddTaskScreen(
     var lists by remember { mutableStateOf<List<TodoList>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
-        lists = fileRepository.getAllLists().getOrDefault(emptyList())
+        lists = fileRepository.getAllLists(includeCounts = false).getOrDefault(emptyList())
         isLoading = false
     }
 

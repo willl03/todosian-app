@@ -46,14 +46,15 @@ class HomeViewModel(
         refresh()
     }
 
-    fun refresh(showLoading: Boolean = true) {
-        viewModelScope.launch { doRefresh(showLoading) }
+    fun refresh(showLoading: Boolean = true, includeCounts: Boolean = true) {
+        viewModelScope.launch { doRefresh(showLoading, includeCounts) }
     }
 
     /** Awaitable refresh for pull-to-refresh: completes when the re-scan is done. */
-    suspend fun refreshNow(showLoading: Boolean = false) = doRefresh(showLoading)
+    suspend fun refreshNow(showLoading: Boolean = false, includeCounts: Boolean = true) =
+        doRefresh(showLoading, includeCounts)
 
-    private suspend fun doRefresh(showLoading: Boolean) {
+    private suspend fun doRefresh(showLoading: Boolean, includeCounts: Boolean) {
         val folderUri = fileRepository.getFolderUri()
         if (folderUri == null) {
             _events.emit(Event.RequireOnboarding)
@@ -65,7 +66,7 @@ class HomeViewModel(
         if (shouldShowLoading) {
             _uiState.value = _uiState.value.copy(isLoading = true)
         }
-        val result = fileRepository.getVaultContent()
+        val result = fileRepository.getVaultContent(includeCounts)
         if (result.isFailure) {
             fileRepository.clearFolderUri()
             _events.emit(Event.ShowMessage(R.string.error_folder_invalid))

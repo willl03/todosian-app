@@ -197,7 +197,7 @@ private fun WidgetConfigureScreen(
             isLoading = false
             return@LaunchedEffect
         }
-        lists = fileRepository.getAllLists().getOrDefault(emptyList())
+        lists = fileRepository.getAllLists(includeCounts = true).getOrDefault(emptyList())
         isLoading = false
     }
 
