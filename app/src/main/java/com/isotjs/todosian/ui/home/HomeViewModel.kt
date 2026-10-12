@@ -6,7 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.Folder
+import com.isotjs.todosian.data.model.TodoList
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,14 +17,18 @@ import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val isLoading: Boolean = false,
-    val categories: List<Category> = emptyList(),
+    val folders: List<Folder> = emptyList(),
+    val unfiledLists: List<TodoList> = emptyList(),
 ) {
+    /** Every list in the vault; drives the Daily focus counters. */
+    val allLists: List<TodoList> get() = unfiledLists + folders.flatMap { it.lists }
+
     fun remainingFor(mode: com.isotjs.todosian.data.settings.DailyFocusMode): Int {
         return when (mode) {
-            com.isotjs.todosian.data.settings.DailyFocusMode.TODAY -> categories.sumOf { it.dueTodayCount }
-            com.isotjs.todosian.data.settings.DailyFocusMode.OVERDUE -> categories.sumOf { it.overdueCount }
+            com.isotjs.todosian.data.settings.DailyFocusMode.TODAY -> allLists.sumOf { it.dueTodayCount }
+            com.isotjs.todosian.data.settings.DailyFocusMode.OVERDUE -> allLists.sumOf { it.overdueCount }
             com.isotjs.todosian.data.settings.DailyFocusMode.TODAY_AND_OVERDUE ->
-                categories.sumOf { it.dueTodayCount + it.overdueCount }
+                allLists.sumOf { it.dueTodayCount + it.overdueCount }
         }
     }
 }
@@ -50,11 +55,11 @@ class HomeViewModel(
                 return@launch
             }
 
-            val shouldShowLoading = showLoading || _uiState.value.categories.isEmpty()
+            val shouldShowLoading = showLoading || _uiState.value.folders.isEmpty()
             if (shouldShowLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
-            val result = fileRepository.getCategories()
+            val result = fileRepository.getVaultContent()
             if (result.isFailure) {
                 fileRepository.clearFolderUri()
                 _events.emit(Event.ShowMessage(R.string.error_folder_invalid))
@@ -63,21 +68,18 @@ class HomeViewModel(
                 return@launch
             }
 
+            val content = result.getOrThrow()
             _uiState.value = HomeUiState(
                 isLoading = false,
-                categories = result.getOrThrow(),
+                folders = content.folders,
+                unfiledLists = content.unfiledLists,
             )
         }
     }
 
-    fun createCategory(name: String) {
+    fun createFolder(name: String) {
         viewModelScope.launch {
-            val folderUri = fileRepository.getFolderUri() ?: run {
-                _events.emit(Event.RequireOnboarding)
-                return@launch
-            }
-
-            val created = fileRepository.createCategory(folderUri, name)
+            val created = fileRepository.createFolder(name)
             if (created.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -86,9 +88,9 @@ class HomeViewModel(
         }
     }
 
-    fun renameCategory(categoryUri: Uri, newName: String) {
+    fun renameFolder(folderUri: Uri, newName: String) {
         viewModelScope.launch {
-            val result = fileRepository.renameCategory(categoryUri, newName)
+            val result = fileRepository.renameFolder(folderUri, newName)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -97,9 +99,9 @@ class HomeViewModel(
         }
     }
 
-    fun deleteCategory(categoryUri: Uri) {
+    fun deleteFolder(folderUri: Uri) {
         viewModelScope.launch {
-            val result = fileRepository.deleteCategory(categoryUri)
+            val result = fileRepository.deleteFolder(folderUri)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch

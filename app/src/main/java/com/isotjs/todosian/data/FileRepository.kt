@@ -9,7 +9,9 @@ import android.os.Looper
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
-import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.Folder
+import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.utils.MarkdownParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +37,14 @@ interface FileRepository {
 
     suspend fun persistFolderUri(uri: Uri): Result<Unit>
 
-    suspend fun getCategories(): Result<List<Category>>
+    /** Full vault layout: real folders (A–Z) plus the root-level "Unfiled lists" pseudo-folder. */
+    suspend fun getVaultContent(): Result<VaultContent>
+
+    /** Every list in the vault, flattened across folders (for widgets, daily focus, pickers). */
+    suspend fun getAllLists(): Result<List<TodoList>>
+
+    /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder). */
+    suspend fun getListsIn(parentUri: Uri): Result<List<TodoList>>
 
     suspend fun readLines(uri: Uri): Result<List<String>>
 
@@ -44,14 +53,27 @@ interface FileRepository {
     suspend fun getFolderDisplayName(folderUri: Uri): Result<String>
 
     suspend fun writeLines(uri: Uri, lines: List<String>): Result<Unit>
-    
+
     suspend fun updateLines(uri: Uri, transform: (List<String>) -> List<String>?): Result<Unit>
 
-    suspend fun createCategory(folderUri: Uri, name: String): Result<Uri>
+    suspend fun createFolder(name: String): Result<Uri>
 
-    suspend fun renameCategory(categoryUri: Uri, newName: String): Result<Unit>
+    suspend fun renameFolder(folderUri: Uri, newName: String): Result<Unit>
 
-    suspend fun deleteCategory(categoryUri: Uri): Result<Unit>
+    suspend fun deleteFolder(folderUri: Uri): Result<Unit>
+
+    suspend fun createList(parentUri: Uri, name: String): Result<Uri>
+
+    suspend fun renameList(listUri: Uri, newName: String): Result<Unit>
+
+    suspend fun deleteList(listUri: Uri): Result<Unit>
+
+    /**
+     * Moves a list document into [targetFolderUri] (a folder URI, or the vault root for unfiled).
+     * [sourceParentUri] is the list's current containing directory, or null when the caller cannot
+     * provide it. Returns the list's URI after the move (SAF providers may issue a new one).
+     */
+    suspend fun moveList(listUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri>
 
     suspend fun moveTodoLine(sourceUri: Uri, targetUri: Uri, lineIndex: Int): Result<Unit>
 
@@ -73,7 +95,7 @@ class SafFileRepository(
 
     private val widgetUpdateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fileMutex = Mutex()
-    
+
     @Volatile
     private var widgetUpdateJob: Job? = null
 
@@ -98,6 +120,38 @@ class SafFileRepository(
     companion object {
         private const val WIDGET_UPDATE_DEBOUNCE_MS = 50L
         private const val TAG = "SafFileRepository"
+
+        /**
+         * True when [name] is a Markdown list document the app should surface: a `.md` file that
+         * is not a sync-conflict artifact. Pure so it can be unit tested.
+         */
+        fun isListFileName(name: String?): Boolean {
+            if (name == null) return false
+            return name.endsWith(".md", ignoreCase = true) &&
+                !name.contains("sync-conflict", ignoreCase = true)
+        }
+
+        /**
+         * True when a directory entry should be hidden from the vault layout: dot-prefixed
+         * entries (`.obsidian`, `.stfolder`, `.git`, …) and sync-conflict artifacts.
+         */
+        fun isIgnoredEntryName(name: String?): Boolean {
+            if (name == null) return true
+            return name.startsWith(".") || name.contains("sync-conflict", ignoreCase = true)
+        }
+    }
+
+    /**
+     * Document-form URI for a parent directory. Folder URIs obtained from `listFiles()` are
+     * already document URIs; the vault root tree URI is not, so its tree document id is used.
+     */
+    private fun parentDocumentUri(parentUri: Uri): Uri {
+        val docId = if (DocumentsContract.isDocumentUri(appContext, parentUri)) {
+            DocumentsContract.getDocumentId(parentUri)
+        } else {
+            DocumentsContract.getTreeDocumentId(parentUri)
+        }
+        return DocumentsContract.buildDocumentUriUsingTree(parentUri, docId)
     }
 
     override fun getFolderUri(): Uri? = preferencesManager.getFolderUri()
@@ -119,45 +173,88 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getCategories(): Result<List<Category>> {
-        val folderUri = getFolderUri() ?: return Result.success(emptyList())
+    override suspend fun getVaultContent(): Result<VaultContent> {
+        val folderUri = getFolderUri() ?: return Result.success(VaultContent(emptyList(), emptyList()))
         return withContext(Dispatchers.IO) {
             runCatching {
-                val folder = DocumentFile.fromTreeUri(appContext, folderUri)
+                val root = DocumentFile.fromTreeUri(appContext, folderUri)
                     ?: throw IllegalStateException("Invalid folder URI")
 
-                folder.listFiles()
-                    .asSequence()
-                    .filter { it.isFile }
-                    .filter { file ->
-                        val name = file.name.orEmpty()
-                        name.endsWith(".md", ignoreCase = true) && !name.contains("sync-conflict", ignoreCase = true)
-                    }
-                    .map { file ->
-                        val name = file.name ?: ""
-                        val displayName = name.removeSuffix(".md")
-                        val lines = readLinesInternal(file.uri)
-                        val todos = MarkdownParser.parse(lines)
-                        val doneCount = todos.count { it.isDone }
-                        val today = LocalDate.now().toString()
-                        val activeTodos = todos.filter { !it.isDone }
-                        val dueTodayCount = activeTodos.count { it.dueDate == today }
-                        val overdueCount = activeTodos.count { todo ->
-                            todo.dueDate?.let { it < today } == true
-                        }
-                        Category(
-                            displayName = displayName,
-                            uri = file.uri,
-                            todoCount = todos.size,
-                            doneCount = doneCount,
-                            dueTodayCount = dueTodayCount,
-                            overdueCount = overdueCount,
+                val children = root.listFiles()
+                val folders = children.asSequence()
+                    .filter { it.isDirectory }
+                    .filter { !isIgnoredEntryName(it.name) }
+                    .map { dir ->
+                        Folder(
+                            displayName = dir.name.orEmpty(),
+                            uri = dir.uri,
+                            lists = dir.listFiles()
+                                .asSequence()
+                                .filter { it.isFile }
+                                .mapNotNull { parseListFile(it) }
+                                .sortedBy { it.displayName.lowercase() }
+                                .toList(),
                         )
                     }
+                    .filter { it.displayName.isNotEmpty() }
+                    .sortedBy { it.displayName.lowercase() }
+                    .toList()
+
+                val unfiledLists = children.asSequence()
+                    .filter { it.isFile }
+                    .mapNotNull { parseListFile(it) }
+                    .sortedBy { it.displayName.lowercase() }
+                    .toList()
+
+                VaultContent(folders = folders, unfiledLists = unfiledLists)
+            }
+        }
+    }
+
+    override suspend fun getAllLists(): Result<List<TodoList>> {
+        return getVaultContent().mapCatching { it.allLists() }
+    }
+
+    override suspend fun getListsIn(parentUri: Uri): Result<List<TodoList>> {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                // Works for both the vault root tree URI and a folder's document URI:
+                // DocumentFile.fromTreeUri resolves the document id from either form.
+                val parent = DocumentFile.fromTreeUri(appContext, parentUri)
+                    ?: throw IllegalStateException("Invalid folder URI")
+
+                parent.listFiles()
+                    .asSequence()
+                    .filter { it.isFile }
+                    .mapNotNull { parseListFile(it) }
                     .sortedBy { it.displayName.lowercase() }
                     .toList()
             }
         }
+    }
+
+    /** Reads and parses one `.md` document into a [TodoList]; null when it is not a list file. */
+    private fun parseListFile(file: DocumentFile): TodoList? {
+        val name = file.name
+        if (!isListFileName(name)) return null
+        val displayName = name.orEmpty().removeSuffix(".md")
+        val lines = readLinesInternal(file.uri)
+        val todos = MarkdownParser.parse(lines)
+        val doneCount = todos.count { it.isDone }
+        val today = LocalDate.now().toString()
+        val activeTodos = todos.filter { !it.isDone }
+        val dueTodayCount = activeTodos.count { it.dueDate == today }
+        val overdueCount = activeTodos.count { todo ->
+            todo.dueDate?.let { it < today } == true
+        }
+        return TodoList(
+            displayName = displayName,
+            uri = file.uri,
+            todoCount = todos.size,
+            doneCount = doneCount,
+            dueTodayCount = dueTodayCount,
+            overdueCount = overdueCount,
+        )
     }
 
     override suspend fun readLines(uri: Uri): Result<List<String>> {
@@ -210,17 +307,63 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun createCategory(folderUri: Uri, name: String): Result<Uri> {
+    override suspend fun createFolder(name: String): Result<Uri> {
         val cleaned = name.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
         return withContext(Dispatchers.IO) {
             runCatching {
-                val folder = DocumentFile.fromTreeUri(appContext, folderUri)
+                val root = rootDocument()
+                    ?: throw IllegalStateException("Invalid folder URI")
+
+                val created = root.createDirectory(cleaned)
+                    ?: throw IllegalStateException("Unable to create folder")
+                created.uri
+            }
+        }
+    }
+
+    override suspend fun renameFolder(folderUri: Uri, newName: String): Result<Unit> {
+        val cleaned = newName.trim()
+        if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
+
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val renamed = DocumentsContract.renameDocument(
+                    appContext.contentResolver,
+                    folderUri,
+                    cleaned,
+                )
+                if (renamed == null) throw IllegalStateException("Unable to rename folder")
+                scheduleWidgetUpdate()
+            }
+        }
+    }
+
+    override suspend fun deleteFolder(folderUri: Uri): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val ok = DocumentsContract.deleteDocument(
+                    appContext.contentResolver,
+                    parentDocumentUri(folderUri),
+                )
+                if (!ok) throw IllegalStateException("Unable to delete folder")
+                scheduleWidgetUpdate()
+            }
+        }
+    }
+
+    override suspend fun createList(parentUri: Uri, name: String): Result<Uri> {
+        val cleaned = name.trim()
+        if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
+
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val parent = DocumentFile.fromTreeUri(appContext, parentUri)
                     ?: throw IllegalStateException("Invalid folder URI")
 
                 val fileName = if (cleaned.endsWith(".md", ignoreCase = true)) cleaned else "$cleaned.md"
-                val created = folder.createFile("text/markdown", fileName)
+                val created = parent.createFile("text/markdown", fileName)
                     ?: throw IllegalStateException("Unable to create file")
 
                 scheduleWidgetUpdate()
@@ -229,7 +372,7 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun renameCategory(categoryUri: Uri, newName: String): Result<Unit> {
+    override suspend fun renameList(listUri: Uri, newName: String): Result<Unit> {
         val cleaned = newName.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
@@ -243,23 +386,72 @@ class SafFileRepository(
                     .trim()
                     .let { base -> if (base.endsWith(".md", ignoreCase = true)) base else "$base.md" }
 
-                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, categoryUri, fileName)
+                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, listUri, fileName)
                 if (renamed == null) throw IllegalStateException("Unable to rename document")
                 scheduleWidgetUpdate()
             }
         }
     }
 
-    override suspend fun deleteCategory(categoryUri: Uri): Result<Unit> {
+    override suspend fun deleteList(listUri: Uri): Result<Unit> {
         return withContext(Dispatchers.IO) {
             runCatching {
-                val file = DocumentFile.fromSingleUri(appContext, categoryUri)
+                val file = DocumentFile.fromSingleUri(appContext, listUri)
                     ?: throw IllegalStateException("Invalid file URI")
                 val ok = file.delete()
                 if (!ok) throw IllegalStateException("Unable to delete file")
                 scheduleWidgetUpdate()
             }
         }
+    }
+
+    override suspend fun moveList(listUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri> {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val treeUri = getFolderUri() ?: throw IllegalStateException("No folder selected")
+                val sourceParent = sourceParentUri ?: treeUri
+
+                val moved = DocumentsContract.moveDocument(
+                    appContext.contentResolver,
+                    listUri,
+                    parentDocumentUri(sourceParent),
+                    parentDocumentUri(targetFolderUri),
+                )
+                if (moved == null) throw IllegalStateException("Unable to move list")
+
+                // The move may have changed the document URI; keep widget bindings that point at
+                // the old URI working by rewriting them to the new one.
+                WidgetRefresher.remapSelection(appContext, oldUri = listUri, newUri = moved)
+                scheduleWidgetUpdate()
+                moved
+            }
+        }.recoverCatching { error ->
+            // Some providers do not support moveDocument. Fall back to copy-then-delete, which
+            // preserves the document content (all lines, including non-todo ones).
+            Log.w(TAG, "moveDocument failed, falling back to copy+delete", error)
+            moveListByCopyDelete(listUri, targetFolderUri)
+        }
+    }
+
+    /** Fallback for providers without moveDocument: copy the content, then delete the original. */
+    private suspend fun moveListByCopyDelete(listUri: Uri, targetFolderUri: Uri): Uri {
+        val name = getDisplayName(listUri).getOrThrow().removeSuffix(".md")
+        if (name.isEmpty()) throw IllegalStateException("Unable to resolve list name")
+
+        val lines = readLines(listUri).getOrThrow()
+        val created = createList(targetFolderUri, name).getOrThrow()
+        try {
+            writeLines(created, lines).getOrThrow()
+        } catch (e: Exception) {
+            // Never leave a half-written copy behind; keep the original intact.
+            runCatching { deleteList(created) }
+            throw e
+        }
+        deleteList(listUri).getOrThrow()
+
+        WidgetRefresher.remapSelection(appContext, oldUri = listUri, newUri = created)
+        scheduleWidgetUpdate()
+        return created
     }
 
     override suspend fun moveTodoLine(sourceUri: Uri, targetUri: Uri, lineIndex: Int): Result<Unit> {
@@ -304,14 +496,18 @@ class SafFileRepository(
     override suspend fun countMarkdownFiles(folderUri: Uri): Result<Int> {
         return withContext(Dispatchers.IO) {
             runCatching {
-                val folder = DocumentFile.fromTreeUri(appContext, folderUri)
+                val root = DocumentFile.fromTreeUri(appContext, folderUri)
                     ?: throw IllegalStateException("Invalid folder URI")
 
-                folder.listFiles().count { file ->
-                    if (!file.isFile) return@count false
-                    val name = file.name.orEmpty()
-                    name.endsWith(".md", ignoreCase = true) && !name.contains("sync-conflict", ignoreCase = true)
+                var count = 0
+                for (entry in root.listFiles()) {
+                    if (isListFileName(entry.name) && entry.isFile) {
+                        count++
+                    } else if (entry.isDirectory && !isIgnoredEntryName(entry.name)) {
+                        count += entry.listFiles().count { it.isFile && isListFileName(it.name) }
+                    }
                 }
+                count
             }
         }
     }
@@ -338,24 +534,39 @@ class SafFileRepository(
 
             lateinit var observer: ContentObserver
 
+            fun dirChildrenUri(dirUri: Uri): Uri {
+                val dirDocId = DocumentsContract.getDocumentId(dirUri)
+                return DocumentsContract.buildChildDocumentsUriUsingTree(dirUri, dirDocId)
+            }
+
             fun currentMarkdownUris(): List<Pair<Uri, Boolean>> {
-                val folder = DocumentFile.fromTreeUri(appContext, folderUri) ?: return emptyList()
-                val fileUris = folder.listFiles()
-                    .asSequence()
-                    .filter { it.isFile }
-                    .filter {
-                        val name = it.name.orEmpty()
-                        name.endsWith(".md", ignoreCase = true) && !name.contains("sync-conflict", ignoreCase = true)
-                    }
-                    .map { it.uri }
-                    .toList()
+                val root = DocumentFile.fromTreeUri(appContext, folderUri) ?: return emptyList()
 
                 val uris = mutableListOf<Pair<Uri, Boolean>>()
-                // structural changes
+                // structural changes at the vault root
                 uris.add(folderUri to true)
                 uris.add(childrenUri to true)
-                // content changes
-                fileUris.forEach { uris.add(it to false) }
+
+                for (entry in root.listFiles()) {
+                    if (entry.isDirectory) {
+                        if (isIgnoredEntryName(entry.name)) continue
+                        // structural changes inside a folder (lists created/renamed/deleted)
+                        uris.add(entry.uri to true)
+                        uris.add(dirChildrenUri(entry.uri) to true)
+                    } else if (isListFileName(entry.name)) {
+                        // content changes of a root-level (unfiled) list
+                        uris.add(entry.uri to false)
+                    }
+                }
+                // content changes of lists inside folders
+                for (entry in root.listFiles()) {
+                    if (!entry.isDirectory || isIgnoredEntryName(entry.name)) continue
+                    for (file in entry.listFiles()) {
+                        if (file.isFile && isListFileName(file.name)) {
+                            uris.add(file.uri to false)
+                        }
+                    }
+                }
                 return uris
             }
 
@@ -382,10 +593,10 @@ class SafFileRepository(
                 override fun onChange(selfChange: Boolean, changedUri: Uri?) {
                     trySend(Unit)
                     val changed = changedUri?.toString().orEmpty()
-                    val shouldUpdate = changedUri == null ||
-                        changedUri == folderUri ||
-                        changedUri == childrenUri ||
-                        (changed.isNotEmpty() && changed.startsWith(childrenUri.toString()))
+                    // Every observed URI (tree root, children collections, list documents) sits
+                    // below the tree URI; only react to changes from our own tree. The trailing
+                    // separator avoids matching a sibling tree whose id merely starts alike.
+                    val shouldUpdate = changedUri == null || changed.startsWith("$folderUri/")
                     if (shouldUpdate) scheduleUpdate()
                 }
             }
@@ -445,6 +656,11 @@ class SafFileRepository(
         }.conflate()
     }
 
+    private fun rootDocument(): DocumentFile? {
+        val folderUri = getFolderUri() ?: return null
+        return DocumentFile.fromTreeUri(appContext, folderUri)
+    }
+
     private fun readLinesInternal(uri: Uri): List<String> {
         appContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
             return reader.readLines()
@@ -461,7 +677,7 @@ class SafFileRepository(
                 }
             }
         } ?: throw IllegalStateException("Unable to open output stream")
-        
+
         try {
             appContext.contentResolver.notifyChange(uri, null)
         } catch (e: Exception) {

@@ -1,4 +1,4 @@
-package com.isotjs.todosian.ui.category
+package com.isotjs.todosian.ui.list
 
 import android.net.Uri
 import androidx.annotation.StringRes
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-data class CategoryUiState(
+data class ListUiState(
     val isLoading: Boolean = false,
     val title: String = "",
     val activeTodos: List<Todo> = emptyList(),
@@ -36,13 +36,13 @@ data class MoveTarget(
     val uri: Uri,
 )
 
-class CategoryViewModel(
+class ListViewModel(
     private val fileRepository: FileRepository,
-    private val categoryUri: Uri,
+    private val listUri: Uri,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CategoryUiState(isLoading = true))
-    val uiState: StateFlow<CategoryUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(ListUiState(isLoading = true))
+    val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<Event>()
     val events = _events.asSharedFlow()
@@ -58,7 +58,7 @@ class CategoryViewModel(
     private fun observeExternalChanges() {
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
-            fileRepository.observeDocumentChanges(categoryUri)
+            fileRepository.observeDocumentChanges(listUri)
                 .debounce(250)
                 .catch {
                     // TODO: Pull to refresh.
@@ -79,10 +79,10 @@ class CategoryViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
-            val nameResult = fileRepository.getDisplayName(categoryUri)
+            val nameResult = fileRepository.getDisplayName(listUri)
             val title = nameResult.getOrNull()?.removeSuffix(".md").orEmpty()
 
-            val linesResult = fileRepository.readLines(categoryUri)
+            val linesResult = fileRepository.readLines(listUri)
             if (linesResult.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
                 _uiState.value = _uiState.value.copy(isLoading = false, title = title)
@@ -95,7 +95,7 @@ class CategoryViewModel(
             val todos = MarkdownParser.parse(lines)
             val (completed, active) = todos.partition { it.isDone }
 
-            _uiState.value = CategoryUiState(
+            _uiState.value = ListUiState(
                 isLoading = false,
                 title = title,
                 activeTodos = active.sortedBy { it.lineIndex },
@@ -112,9 +112,9 @@ class CategoryViewModel(
 
         _uiState.value = state.copy(isLoadingMoveTargets = true)
         viewModelScope.launch {
-            val targets = fileRepository.getCategories()
+            val targets = fileRepository.getAllLists()
                 .getOrElse { emptyList() }
-                .filterNot { it.uri == categoryUri }
+                .filterNot { it.uri == listUri }
                 .map { MoveTarget(title = it.displayName, uri = it.uri) }
                 .sortedBy { it.title.lowercase() }
 
@@ -143,7 +143,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(categoryUri, newLines)
+                val write = fileRepository.writeLines(listUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -177,7 +177,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(categoryUri, newLines)
+                val write = fileRepository.writeLines(listUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -215,7 +215,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(categoryUri, newLines)
+                val write = fileRepository.writeLines(listUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -258,7 +258,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(categoryUri, newLines)
+                val write = fileRepository.writeLines(listUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -285,7 +285,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(categoryUri, newLines)
+                val write = fileRepository.writeLines(listUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -316,7 +316,7 @@ class CategoryViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val result = fileRepository.moveTodoLine(categoryUri, targetUri, todo.lineIndex)
+                val result = fileRepository.moveTodoLine(listUri, targetUri, todo.lineIndex)
                 if (result.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -335,7 +335,7 @@ class CategoryViewModel(
         viewModelScope.launch {
             inFlightWrites.incrementAndGet()
             try {
-                val result = fileRepository.copyTodoLine(categoryUri, targetUri, todo.lineIndex)
+                val result = fileRepository.copyTodoLine(listUri, targetUri, todo.lineIndex)
                 if (result.isFailure) {
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 } else {

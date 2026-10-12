@@ -5,7 +5,6 @@ data class AppSettings(
     val dynamicColorEnabled: Boolean = true,
     val showDailyFocus: Boolean = true,
     val dailyFocusMode: DailyFocusMode = DailyFocusMode.TODAY,
-    val categorySort: CategorySort = CategorySort.A_Z,
     val todoGrouping: TodoGrouping = TodoGrouping.GROUPED,
     val todoSort: TodoSort = TodoSort.FILE_ORDER,
     val newTodoFilePosition: NewTodoFilePosition = NewTodoFilePosition.BOTTOM,
@@ -26,11 +25,6 @@ enum class ThemeMode {
     SYSTEM,
     LIGHT,
     DARK,
-}
-
-enum class CategorySort {
-    A_Z,
-    MOST_REMAINING,
 }
 
 enum class TodoGrouping {

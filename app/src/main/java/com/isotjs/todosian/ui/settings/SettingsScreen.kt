@@ -92,7 +92,6 @@ import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.PreferencesManager
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.AppSettingsRepository
-import com.isotjs.todosian.data.settings.CategorySort
 import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.data.settings.NewTodoFilePosition
 import com.isotjs.todosian.data.settings.ThemeMode
@@ -161,7 +160,6 @@ fun SettingsScreen(
     }
 
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showSortDialog by remember { mutableStateOf(false) }
     var showGroupingDialog by remember { mutableStateOf(false) }
     var showTodoSortDialog by remember { mutableStateOf(false) }
     var showNewTodoFilePositionDialog by remember { mutableStateOf(false) }
@@ -185,19 +183,6 @@ fun SettingsScreen(
             selected = settings.themeMode,
             onSelected = { appSettingsRepository.setThemeMode(it) },
             onDismiss = { showThemeDialog = false },
-        )
-    }
-
-    if (showSortDialog) {
-        SingleChoiceDialog(
-            title = stringResource(R.string.settings_category_sort),
-            options = listOf(
-                ChoiceOption(CategorySort.A_Z, stringResource(R.string.settings_sort_az)),
-                ChoiceOption(CategorySort.MOST_REMAINING, stringResource(R.string.settings_sort_remaining)),
-            ),
-            selected = settings.categorySort,
-            onSelected = { appSettingsRepository.setCategorySort(it) },
-            onDismiss = { showSortDialog = false },
         )
     }
 
@@ -526,15 +511,6 @@ fun SettingsScreen(
 
                         SettingsNavRow(
                             icon = Icons.AutoMirrored.Filled.Sort,
-                            title = stringResource(R.string.settings_category_sort),
-                            subtitle = categorySortLabel(settings.categorySort),
-                            onClick = { showSortDialog = true },
-                        )
-
-                        SettingsDivider()
-
-                        SettingsNavRow(
-                            icon = Icons.AutoMirrored.Filled.Sort,
                             title = stringResource(R.string.settings_todo_grouping),
                             subtitle = todoGroupingLabel(settings.todoGrouping),
                             onClick = { showGroupingDialog = true },
@@ -804,14 +780,6 @@ private fun themeModeLabel(mode: ThemeMode): String {
         ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_system)
         ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
         ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
-    }
-}
-
-@Composable
-private fun categorySortLabel(sort: CategorySort): String {
-    return when (sort) {
-        CategorySort.A_Z -> stringResource(R.string.settings_sort_az)
-        CategorySort.MOST_REMAINING -> stringResource(R.string.settings_sort_remaining)
     }
 }
 

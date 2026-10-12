@@ -1,4 +1,4 @@
-package com.isotjs.todosian.ui.category
+package com.isotjs.todosian.ui.list
 
 import android.net.Uri
 import androidx.compose.animation.core.Spring
@@ -59,12 +59,12 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
@@ -89,25 +89,35 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import java.time.LocalDate
 
+/**
+ * The full todo UI for a single list: top bar, todo rows, add/edit/move sheets and the FAB.
+ * Self-contained so it can be used as a page inside the folder's [HorizontalPager-based]
+ * list pager (see [ListPagerScreen]).
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun CategoryScreen(
+fun ListPage(
     fileRepository: FileRepository,
     appSettingsRepository: AppSettingsRepository,
-    categoryUri: Uri,
+    listUri: Uri,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     autoOpenAddTodo: Boolean = false,
+    /** 1-based position of this list within its folder (for the pager badge). */
+    listPosition: Int = 1,
+    /** Total lists in this list's folder (for the pager badge). */
+    listCount: Int = 1,
 ) {
-    val viewModel: CategoryViewModel = viewModel(
-        factory = CategoryViewModelFactory(
+    val viewModel: ListViewModel = viewModel(
+        key = "list_$listUri",
+        factory = ListViewModelFactory(
             fileRepository = fileRepository,
-            categoryUri = categoryUri,
+            listUri = listUri,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // The note may have changed while the app was away (widget toggle, Obsidian edit, sync);
+    // The list may have changed while the app was away (widget toggle, Obsidian edit, sync);
     // re-read the file whenever the screen becomes visible again.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, viewModel) {
@@ -125,7 +135,7 @@ fun CategoryScreen(
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                is CategoryViewModel.Event.ShowMessage -> {
+                is ListViewModel.Event.ShowMessage -> {
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
                 }
             }
@@ -458,6 +468,14 @@ fun CategoryScreen(
                         )
                     }
                 },
+                actions = {
+                    Text(
+                        text = stringResource(R.string.page_indicator, listPosition, listCount),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 16.dp),
+                    )
+                },
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -702,7 +720,7 @@ private fun sortTodos(todos: List<Todo>, sort: TodoSort): List<Todo> {
                     .thenByDescending { it.createdDate ?: "" }
                     .thenBy { it.lineIndex },
             )
-            
+
         TodoSort.DUE_DATE_EARLIEST_FIRST ->
             todos.sortedWith(
                 compareBy<Todo> { it.dueDate == null }
@@ -759,14 +777,14 @@ private fun sortTodosByPriorityKeepingSubtasks(todos: List<Todo>): List<Todo> {
     return result
 }
 
-private class CategoryViewModelFactory(
+class ListViewModelFactory(
     private val fileRepository: FileRepository,
-    private val categoryUri: Uri,
+    private val listUri: Uri,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(CategoryViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return CategoryViewModel(fileRepository, categoryUri) as T
+            return ListViewModel(fileRepository, listUri) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

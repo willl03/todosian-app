@@ -18,8 +18,8 @@ import androidx.glance.appwidget.updateAll
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.Todo
+import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.utils.MarkdownParser
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -87,10 +87,10 @@ internal fun resolveCategoryKey(
  * back to the stored display name (e.g. when the document URI changed). Returns null for the
  * "All lists" selection, or when the selected note no longer exists.
  */
-internal fun resolveSelectedCategory(
-    categories: List<Category>,
+internal fun resolveSelectedList(
+    categories: List<TodoList>,
     selection: WidgetSelection,
-): Category? {
+): TodoList? {
     if (selection.isAllLists) return null
     val resolvedKey = resolveCategoryKey(
         categoryKeys = categories.map { it.uri.toString() to it.displayName },
@@ -143,8 +143,8 @@ internal data class WidgetSnapshot(
         prefs[MISSING_LIST_KEY] = missingList
         items.forEachIndexed { index, item ->
             val prefix = "$ITEM_KEY_PREFIX$index."
-            prefs[stringPreferencesKey("${prefix}category_uri")] = item.categoryUri
-            prefs[stringPreferencesKey("${prefix}category_name")] = item.categoryName
+            prefs[stringPreferencesKey("${prefix}category_uri")] = item.listUri
+            prefs[stringPreferencesKey("${prefix}category_name")] = item.listName
             prefs[stringPreferencesKey("${prefix}text")] = item.todo.text
             prefs[intPreferencesKey("${prefix}line_index")] = item.todo.lineIndex
             prefs[booleanPreferencesKey("${prefix}is_done")] = item.todo.isDone
@@ -173,8 +173,8 @@ internal data class WidgetSnapshot(
                 val dueDate = prefs[stringPreferencesKey("${prefix}due_date")]
                 items.add(
                     WidgetTaskItem(
-                        categoryUri = categoryUri,
-                        categoryName = prefs[stringPreferencesKey("${prefix}category_name")] ?: "",
+                        listUri = categoryUri,
+                        listName = prefs[stringPreferencesKey("${prefix}category_name")] ?: "",
                         todo = Todo(
                             // `id` is a per-parse random UUID and is not part of the snapshot.
                             id = "",
@@ -234,7 +234,7 @@ object WidgetRefresher {
         }
 
         refreshMutex.withLock {
-            val categories = fileRepository.getCategories().getOrDefault(emptyList())
+            val categories = fileRepository.getAllLists().getOrDefault(emptyList())
             val widgetStates = glanceIds.map { glanceId ->
                 runCatching {
                     getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
@@ -250,7 +250,7 @@ object WidgetRefresher {
             val neededUris = buildList {
                 if (selections.any { it.isAllLists }) categories.forEach { add(it.uri) }
                 selections.forEach { selection ->
-                    resolveSelectedCategory(categories, selection)?.let { add(it.uri) }
+                    resolveSelectedList(categories, selection)?.let { add(it.uri) }
                 }
             }.toSet()
             val linesByUri = neededUris.associateWith { uri ->
@@ -286,18 +286,52 @@ object WidgetRefresher {
         }.getOrDefault(false)
 
     /**
+     * Rewrites any widget binding that points at [oldUri] to [newUri]. Used when a list is moved
+     * to another folder (or renamed): SAF issues the document a new URI, which would otherwise
+     * orphan the binding. The following refresh rebuilds snapshots; the display-name fallback in
+     * [resolveCategoryKey] additionally covers bindings whose stored URI was not remapped.
+     */
+    suspend fun remapSelection(context: Context, oldUri: Uri, newUri: Uri) {
+        val manager = GlanceAppWidgetManager(context)
+        val glanceIds = runCatching { manager.getGlanceIds(TodosianWidget::class.java) }
+            .getOrElse {
+                Log.e(TAG, "Unable to query placed TodosianWidgets for remap", it)
+                return
+            }
+        if (glanceIds.isEmpty()) return
+
+        for (glanceId in glanceIds) {
+            runCatching {
+                val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
+                val selection = WidgetSelection.from(prefs)
+                if (selection.categoryUri == oldUri.toString()) {
+                    updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { p ->
+                        p.toMutablePreferences().apply {
+                            WidgetSelection(
+                                categoryUri = newUri.toString(),
+                                categoryName = selection.categoryName,
+                            ).writeTo(this)
+                        }
+                    }
+                }
+            }.onFailure { Log.w(TAG, "Unable to remap widget selection for $glanceId", it) }
+        }
+        TodosianWidget().updateAll(context)
+    }
+
+    /**
      * Builds the snapshot for one widget instance. For "All lists" the items are aggregated across
      * every note (active first, then completed), capped at [MAX_TASKS]; for a bound note only that
      * note's tasks are used.
      */
     private fun buildSnapshot(
         hasFolder: Boolean,
-        categories: List<Category>,
+        categories: List<TodoList>,
         linesByUri: Map<Uri, List<String>>,
         selection: WidgetSelection,
         showCompleted: Boolean,
     ): WidgetSnapshot {
-        val resolved = resolveSelectedCategory(categories, selection)
+        val resolved = resolveSelectedList(categories, selection)
 
         if (selection.categoryUri != null && resolved == null) {
             // The bound note was renamed or deleted; keep the title so the user knows which
@@ -318,8 +352,8 @@ object WidgetRefresher {
             val lines = linesByUri[category.uri].orEmpty()
             MarkdownParser.parse(lines).map { todo ->
                 WidgetTaskItem(
-                    categoryUri = category.uri.toString(),
-                    categoryName = category.displayName,
+                    listUri = category.uri.toString(),
+                    listName = category.displayName,
                     todo = todo,
                 )
             }

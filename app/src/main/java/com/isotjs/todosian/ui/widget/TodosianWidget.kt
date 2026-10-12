@@ -44,8 +44,8 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.model.Todo
 
 data class WidgetTaskItem(
-    val categoryUri: String,
-    val categoryName: String,
+    val listUri: String,
+    val listName: String,
     val todo: Todo,
 )
 
@@ -100,7 +100,7 @@ class TodosianWidget : GlanceAppWidget() {
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 if (selectedCategoryUri != null) {
-                    putExtra(MainActivity.EXTRA_OPEN_ADD_TASK_CATEGORY, selectedCategoryUri)
+                    putExtra(MainActivity.EXTRA_OPEN_ADD_TASK_LIST, selectedCategoryUri)
                 } else {
                     putExtra(MainActivity.EXTRA_OPEN_ADD_TASK, true)
                 }
@@ -226,7 +226,7 @@ class TodosianWidget : GlanceAppWidget() {
                 ) {
                     items(
                         items = items,
-                        itemId = { item -> (item.categoryUri + ":" + item.todo.lineIndex + ":" + item.todo.text + ":" + item.todo.isDone).hashCode().toLong() },
+                        itemId = { item -> (item.listUri + ":" + item.todo.lineIndex + ":" + item.todo.text + ":" + item.todo.isDone).hashCode().toLong() },
                     ) { item ->
                         TaskRow(item)
                     }
@@ -248,7 +248,7 @@ class TodosianWidget : GlanceAppWidget() {
         ) {
             val checkBoxAction = actionRunCallback<ToggleTaskAction>(
                 actionParametersOf(
-                    ToggleTaskAction.PARAM_CATEGORY_URI to item.categoryUri,
+                    ToggleTaskAction.PARAM_CATEGORY_URI to item.listUri,
                     ToggleTaskAction.PARAM_LINE_INDEX to todo.lineIndex,
                     ToggleTaskAction.PARAM_TODO_TEXT to todo.text,
                 )
@@ -276,7 +276,7 @@ class TodosianWidget : GlanceAppWidget() {
                 )
 
                 val details = listOfNotNull(
-                    item.categoryName.takeIf { it.isNotBlank() },
+                    item.listName.takeIf { it.isNotBlank() },
                     todo.dueDate?.let { "📅 $it" },
                 ).joinToString(" • ")
 

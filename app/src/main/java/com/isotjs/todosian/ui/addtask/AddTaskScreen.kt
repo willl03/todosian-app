@@ -32,7 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
@@ -41,15 +41,15 @@ import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 @Composable
 fun AddTaskScreen(
     fileRepository: FileRepository,
-    onSelectCategory: (Uri) -> Unit,
+    onSelectList: (Uri) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(true) }
-    var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var lists by remember { mutableStateOf<List<TodoList>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
-        categories = fileRepository.getCategories().getOrDefault(emptyList())
+        lists = fileRepository.getAllLists().getOrDefault(emptyList())
         isLoading = false
     }
 
@@ -81,7 +81,7 @@ fun AddTaskScreen(
                 }
             }
 
-            categories.isEmpty() -> {
+            lists.isEmpty() -> {
                 TodosianEmptyState(
                     icon = Icons.Outlined.FolderOff,
                     title = stringResource(R.string.add_task_picker_empty_title),
@@ -108,11 +108,11 @@ fun AddTaskScreen(
                         )
                     }
                     items(
-                        items = categories,
+                        items = lists,
                         key = { it.uri.toString() },
-                    ) { category ->
+                    ) { list ->
                         ListItem(
-                            headlineContent = { Text(text = category.displayName) },
+                            headlineContent = { Text(text = list.displayName) },
                             leadingContent = {
                                 Icon(
                                     imageVector = Icons.Outlined.Folder,
@@ -120,7 +120,7 @@ fun AddTaskScreen(
                                 )
                             },
                             modifier = Modifier.clickable {
-                                onSelectCategory(category.uri)
+                                onSelectList(list.uri)
                             },
                         )
                     }
