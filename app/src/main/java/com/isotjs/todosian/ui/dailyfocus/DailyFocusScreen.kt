@@ -159,6 +159,22 @@ fun DailyFocusScreen(
                         },
                 )
 
+                // Shared by the Save button and the note field's keyboard ✓ action.
+                val saveSheet: () -> Unit = {
+                    val task = sheetTask
+                    if (task != null && sheetText.trim().isNotEmpty()) {
+                        viewModel.editTodo(
+                            task = task,
+                            newText = sheetText,
+                            meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
+                        )
+                        scope.launch {
+                            todoSheetState.hide()
+                            dismissSheet()
+                        }
+                    }
+                }
+
                 if (settings.enableTasksPluginSupport) {
                     Spacer(modifier = Modifier.height(12.dp))
                     TasksMetaEditor(
@@ -166,6 +182,7 @@ fun DailyFocusScreen(
                         meta = sheetMeta,
                         onMetaChange = { sheetMeta = it },
                         useEmojisInUi = settings.tasksPluginUseEmojisInUi,
+                        onNoteImeAction = saveSheet,
                     )
                 }
 
@@ -185,20 +202,7 @@ fun DailyFocusScreen(
                         Text(text = stringResource(R.string.action_cancel))
                     }
                     TextButton(
-                        onClick = {
-                            val task = sheetTask
-                            if (task != null) {
-                                viewModel.editTodo(
-                                    task = task,
-                                    newText = sheetText,
-                                    meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
-                                )
-                            }
-                            scope.launch {
-                                todoSheetState.hide()
-                                dismissSheet()
-                            }
-                        },
+                        onClick = saveSheet,
                         enabled = sheetText.trim().isNotEmpty(),
                     ) {
                         Text(text = stringResource(R.string.action_save))

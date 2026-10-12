@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextOverflow
@@ -264,6 +266,8 @@ fun TasksMetaEditor(
     onMetaChange: (MarkdownParser.TasksMeta) -> Unit,
     useEmojisInUi: Boolean,
     modifier: Modifier = Modifier,
+    /** Invoked when the note field's keyboard action (✓) fires; lets the sheet save. */
+    onNoteImeAction: () -> Unit = {},
 ) {
     val isAdd = mode is TodoSheetMode.Add
     // The completion date is set automatically when a task is checked in the list; the field
@@ -324,7 +328,11 @@ fun TasksMetaEditor(
                 onMetaChange(meta.copy(note = value.ifBlank { null }))
             },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { onNoteImeAction() }),
             label = {
                 Text(
                     text = if (useEmojisInUi) {

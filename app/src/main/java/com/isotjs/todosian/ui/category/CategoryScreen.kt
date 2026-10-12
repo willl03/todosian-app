@@ -262,6 +262,48 @@ fun CategoryScreen(
                         },
                 )
 
+                // Shared by the Save button and the note field's keyboard ✓ action.
+                val saveSheet: () -> Unit = {
+                    if (sheetText.trim().isNotEmpty()) {
+                        when (val mode = sheetMode) {
+                            TodoSheetMode.Add -> viewModel.addTodo(
+                                text = sheetText,
+                                meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
+                                enableTasksPluginSupport = settings.enableTasksPluginSupport,
+                                addAtStart = settings.newTodoFilePosition == NewTodoFilePosition.TOP,
+                            )
+
+                            is TodoSheetMode.Edit -> viewModel.editTodo(
+                                todo = mode.todo,
+                                newText = sheetText,
+                                meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
+                                enableTasksPluginSupport = settings.enableTasksPluginSupport,
+                            )
+
+                            TodoSheetMode.AddSubtask -> {
+                                val parent = sheetParentTodo
+                                if (parent != null) {
+                                    viewModel.addSubTodo(
+                                        parent = parent,
+                                        text = sheetText,
+                                        meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
+                                        enableTasksPluginSupport = settings.enableTasksPluginSupport,
+                                    )
+                                }
+                            }
+
+                            null -> Unit
+                        }
+                        scope.launch {
+                            todoSheetState.hide()
+                            sheetMode = null
+                            sheetText = ""
+                            sheetMeta = MarkdownParser.TasksMeta()
+                            sheetParentTodo = null
+                        }
+                    }
+                }
+
                 if (settings.enableTasksPluginSupport) {
                     Spacer(modifier = Modifier.height(12.dp))
                     TasksMetaEditor(
@@ -269,6 +311,7 @@ fun CategoryScreen(
                         meta = sheetMeta,
                         onMetaChange = { sheetMeta = it },
                         useEmojisInUi = settings.tasksPluginUseEmojisInUi,
+                        onNoteImeAction = saveSheet,
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -290,44 +333,7 @@ fun CategoryScreen(
                         Text(text = stringResource(R.string.action_cancel))
                     }
                     TextButton(
-                        onClick = {
-                            when (val mode = sheetMode) {
-                                TodoSheetMode.Add -> viewModel.addTodo(
-                                    text = sheetText,
-                                    meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
-                                    enableTasksPluginSupport = settings.enableTasksPluginSupport,
-                                    addAtStart = settings.newTodoFilePosition == NewTodoFilePosition.TOP,
-                                )
-
-                                is TodoSheetMode.Edit -> viewModel.editTodo(
-                                    todo = mode.todo,
-                                    newText = sheetText,
-                                    meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
-                                    enableTasksPluginSupport = settings.enableTasksPluginSupport,
-                                )
-
-                                TodoSheetMode.AddSubtask -> {
-                                    val parent = sheetParentTodo
-                                    if (parent != null) {
-                                        viewModel.addSubTodo(
-                                            parent = parent,
-                                            text = sheetText,
-                                            meta = if (settings.enableTasksPluginSupport) sheetMeta else null,
-                                            enableTasksPluginSupport = settings.enableTasksPluginSupport,
-                                        )
-                                    }
-                                }
-
-                                null -> Unit
-                            }
-                            scope.launch {
-                                todoSheetState.hide()
-                                sheetMode = null
-                                sheetText = ""
-                                sheetMeta = MarkdownParser.TasksMeta()
-                                sheetParentTodo = null
-                            }
-                        },
+                        onClick = saveSheet,
                         enabled = sheetText.trim().isNotEmpty(),
                     ) {
                         Text(text = stringResource(R.string.action_save))
