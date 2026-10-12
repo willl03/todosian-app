@@ -29,8 +29,8 @@
     <string name="home_create_folder">Create folder</string>
     <string name="home_new_folder_title">New folder</string>
     <string name="home_new_folder_hint">Folder name</string>
-    <string name="home_unfiled_title">Unfiled sections</string>
-    <string name="home_folder_lists_empty">No sections yet</string>
+    <string name="home_unfiled_title">Unfiled lists</string>
+    <string name="home_folder_lists_empty">No lists yet</string>
     <string name="home_folder_action_rename">Rename</string>
     <string name="home_folder_action_delete">Delete</string>
     <string name="home_folder_action_color">Color</string>
@@ -44,17 +44,17 @@
     <string name="home_rename_folder_error_invalid_chars">Name contains invalid characters.</string>
     <string name="home_rename_folder_error_sync_conflict">Name must not contain "sync-conflict".</string>
     <string name="home_delete_folder_title">Delete folder?</string>
-    <string name="home_delete_folder_body">This deletes the folder and every section inside it from your storage.</string>
+    <string name="home_delete_folder_body">This deletes the folder and every list inside it from your storage.</string>
     <string name="home_delete_folder_confirm">Delete</string>
 
     <!-- Folder (lists inside a folder, incl. the unfiled pseudo-folder) -->
-    <string name="folder_empty_title">No sections yet</string>
-    <string name="folder_empty_subtitle">Add a section to get started.</string>
-    <string name="folder_new_list_title">New section</string>
-    <string name="folder_new_list_hint">Section name</string>
-    <string name="folder_rename_list_title">Rename section</string>
+    <string name="folder_empty_title">No lists yet</string>
+    <string name="folder_empty_subtitle">Add a list to get started.</string>
+    <string name="folder_new_list_title">New list</string>
+    <string name="folder_new_list_hint">List name</string>
+    <string name="folder_rename_list_title">Rename list</string>
     <string name="folder_rename_list_hint">New name</string>
-    <string name="folder_delete_list_title">Delete section?</string>
+    <string name="folder_delete_list_title">Delete list?</string>
     <string name="folder_delete_list_body">This will delete the markdown file from your folder.</string>
     <string name="folder_delete_list_confirm">Delete</string>
     <string name="list_menu_show_completed">Show completed tasks</string>
@@ -65,21 +65,21 @@
     <string name="folder_list_counts_placeholder">…</string>
     <string name="folder_list_action_move_up">Move up</string>
     <string name="folder_list_action_move_down">Move down</string>
-    <string name="folder_move_list_title">Move section</string>
-    <string name="folder_move_list_body">Choose a folder to move this section to.</string>
+    <string name="folder_move_list_title">Move list</string>
+    <string name="folder_move_list_body">Choose a folder to move this list to.</string>
     <string name="folder_move_list_empty">No other folders available.</string>
-    <string name="folder_move_list_success">Section moved.</string>
+    <string name="folder_move_list_success">List moved.</string>
 
     <!-- Folder pager -->
     <string name="folder_unavailable_title">Folder unavailable</string>
     <string name="folder_unavailable_subtitle">This folder was deleted or renamed.</string>
 
     <!-- List pager -->
-    <string name="list_unavailable_title">Section unavailable</string>
-    <string name="list_unavailable_subtitle">This section was moved or deleted.</string>
+    <string name="list_unavailable_title">List unavailable</string>
+    <string name="list_unavailable_subtitle">This list was moved or deleted.</string>
     <string name="page_indicator" translatable="false">%1$d/%2$d</string>
-    <string name="folder_action_reorder">Reorder sections</string>
-    <string name="folder_action_add_section">Add section</string>
+    <string name="folder_action_reorder">Reorder lists</string>
+    <string name="folder_action_add_list">Add list</string>
     <string name="folder_reorder_hint">Hold and drag to reorder</string>
     <string name="todo_row_action_move">Move</string>
     <string name="todo_row_action_delete">Delete</string>
@@ -100,8 +100,8 @@
     <string name="category_delete_todo_body_with_subtasks">This action removes the todo and its subtasks from the markdown file.</string>
     <string name="category_delete_todo_confirm">Delete</string>
     <string name="category_move_title">Move todo</string>
-    <string name="category_move_body">Choose a section to move this todo to.</string>
-    <string name="category_move_empty">No other sections available.</string>
+    <string name="category_move_body">Choose a list to move this todo to.</string>
+    <string name="category_move_empty">No other lists available.</string>
     <string name="category_copy_show">Show copy options</string>
     <string name="category_copy_hide">Hide copy options</string>
     <string name="category_move_success">Todo moved.</string>
@@ -161,7 +161,7 @@
     <string name="cd_open_settings">Open settings</string>
     <string name="cd_overflow_menu">More options</string>
     <string name="cd_add_folder">Add folder</string>
-    <string name="cd_add_list">Add section</string>
+    <string name="cd_add_list">Add list</string>
     <string name="cd_add_todo">Add todo</string>
     <string name="cd_add_subtask">Add subtask</string>
     <string name="cd_navigate_back">Navigate back</string>
@@ -214,7 +214,7 @@
     <string name="settings_show_daily_focus">Daily focus banner</string>
     <string name="settings_show_daily_focus_subtitle">Show remaining tasks on the Home screen.</string>
     <string name="settings_show_completed">Show completed tasks</string>
-    <string name="settings_show_completed_subtitle">Show checked-off tasks inside sections.</string>
+    <string name="settings_show_completed_subtitle">Show checked-off tasks inside lists.</string>
     <string name="settings_daily_focus_mode">Daily focus content</string>
     <string name="settings_daily_focus_mode_today">Today</string>
     <string name="settings_daily_focus_mode_overdue">Overdue</string>
@@ -291,12 +291,12 @@
     <string name="widget_add_task">Add task</string>
     <string name="widget_refresh">Refresh tasks</string>
     <string name="widget_add_task_name">Add task</string>
-    <string name="widget_add_task_description">Quickly add a task to any of your sections.</string>
-    <string name="widget_title_all_lists">All sections</string>
-    <string name="widget_configure_title">Select a section for this widget</string>
-    <string name="widget_configure_all_lists_hint">Shows tasks from every section</string>
+    <string name="widget_add_task_description">Quickly add a task to any of your lists.</string>
+    <string name="widget_title_all_lists">All lists</string>
+    <string name="widget_configure_title">Select a list for this widget</string>
+    <string name="widget_configure_all_lists_hint">Shows tasks from every list</string>
     <string name="widget_configure_show_completed">Show completed tasks</string>
-    <string name="widget_missing_list">Section unavailable. Long-press the widget and choose Edit to pick another.</string>
+    <string name="widget_missing_list">List unavailable. Long-press the widget and choose Edit to pick another.</string>
     <plurals name="widget_configure_task_count">
         <item quantity="one">%d task</item>
         <item quantity="other">%d tasks</item>
@@ -304,7 +304,7 @@
 
     <!-- Add task flow -->
     <string name="add_task_picker_title">Add task</string>
-    <string name="add_task_picker_subtitle">Choose a section to add the task to</string>
-    <string name="add_task_picker_empty_title">No sections found</string>
-    <string name="add_task_picker_empty_subtitle">Open Todosian and create a section first.</string>
+    <string name="add_task_picker_subtitle">Choose a list to add the task to</string>
+    <string name="add_task_picker_empty_title">No lists found</string>
+    <string name="add_task_picker_empty_subtitle">Open Todosian and create a list first.</string>
 </resources>

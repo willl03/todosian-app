@@ -23,7 +23,7 @@ fun FolderMenuItems(
 ) {
     onAddSection?.let { addSection ->
         DropdownMenuItem(
-            text = { Text(text = stringResource(R.string.folder_action_add_section)) },
+            text = { Text(text = stringResource(R.string.folder_action_add_list)) },
             onClick = {
                 onDismiss()
                 addSection()

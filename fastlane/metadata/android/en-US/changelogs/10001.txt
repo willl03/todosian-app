@@ -7,12 +7,11 @@ New Features:
 • Show or hide completed tasks from every list's menu
 • New entries start with a capital letter
 • List pager - swipe between the lists of a folder
-• Tapping a folder opens its first section directly - a fixed folder bar with the folder menu stays on top while the section bars swipe underneath
-• Reorder sections - the folder view (with drag-to-reorder and section creation) is now a menu item away
+• Tapping a folder opens its first list directly - a fixed folder bar with the folder menu stays on top while the list bars swipe underneath
+• Reorder lists - the folder view (with drag-to-reorder and list creation) is now a menu item away
 
 Improvements:
 • Widget task rows no longer repeat the list name when a widget is bound to a single list
-• New folders and sections are created at the bottom of their list instead of alphabetical position
+• New folders and lists are created at the bottom of their list instead of alphabetical position
 • The new-folder dialog includes the color picker
-• Lists are now called "sections" across the app
 • Synced with upstream: safer note links opened from external intents and widgets, plus updated libraries

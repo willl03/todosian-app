@@ -20,8 +20,8 @@
       },
       {
         "icon": "SubdirectoryArrowRight",
-        "title": "Sections, Not Screens",
-        "description": "Tapping a folder now opens its sections directly — a fixed folder bar on top with the folder menu, and each section's own bar swiping underneath. The folder view remains available through Reorder sections, where new sections can be created too."
+        "title": "Open Folders Faster",
+        "description": "Tapping a folder now opens its first list directly — a fixed folder bar on top with the folder menu, and each list's own bar swiping underneath. The folder view remains available through Reorder lists, where new lists can be created too."
       },
       {
         "icon": "Checklist",
