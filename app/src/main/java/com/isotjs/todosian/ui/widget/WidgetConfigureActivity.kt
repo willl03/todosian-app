@@ -86,6 +86,17 @@ class WidgetConfigureActivity : ComponentActivity() {
             return
         }
 
+        // Guard ported from upstream: reject launches whose widget provider belongs to another
+        // package, so a foreign launcher cannot bind through this activity.
+        val boundProvider = AppWidgetManager.getInstance(this)
+            .getAppWidgetInfo(appWidgetId)
+            ?.provider
+        if (boundProvider != null && boundProvider.packageName != packageName) {
+            setResult(RESULT_CANCELED)
+            finish()
+            return
+        }
+
         val app = application as? TodosianApplication
         if (app == null) {
             setResult(RESULT_CANCELED)

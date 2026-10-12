@@ -41,10 +41,11 @@ fun TodosianApp(
     val navController = rememberNavController()
     val addTaskRequest by addTaskSignal.collectAsStateWithLifecycle(initialValue = initialAddTaskRequest)
     val startDestination = remember(fileRepository, addTaskRequest) {
+        val categoryUri = addTaskRequest.categoryUri
         when {
             fileRepository.getFolderUri() == null -> Routes.Onboarding
-            addTaskRequest.tick > 0L && addTaskRequest.categoryUri != null ->
-                Routes.category(Uri.parse(addTaskRequest.categoryUri), addTodo = true)
+            addTaskRequest.tick > 0L && categoryUri != null ->
+                Routes.category(categoryUri.toUri(), addTodo = true)
             addTaskRequest.tick > 0L -> Routes.AddTask
             else -> Routes.Home
         }

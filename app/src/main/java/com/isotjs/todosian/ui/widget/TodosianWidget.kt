@@ -94,8 +94,8 @@ class TodosianWidget : GlanceAppWidget() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
         )
-        // A widget bound to a single list routes "+" straight into that list; unbound widgets
-        // open the regular "pick a list" flow.
+        // A widget bound to a single note routes "+" straight into that note; unbound widgets
+        // open the regular "pick a note" flow.
         val openAddTaskAction = actionStartActivity(
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

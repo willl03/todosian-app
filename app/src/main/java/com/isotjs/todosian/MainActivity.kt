@@ -10,12 +10,13 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.isotjs.todosian.ui.theme.TodosianTheme
 import com.isotjs.todosian.data.settings.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Request to open the add-task flow; [categoryUri] non-null routes straight into that list. */
+/** Request to open the add-task flow; [categoryUri] non-null routes straight into that note. */
 data class AddTaskRequest(val tick: Long, val categoryUri: String?)
 
 class MainActivity : ComponentActivity() {
@@ -71,17 +72,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val wantsGlobalAdd = intent?.getBooleanExtra(EXTRA_OPEN_ADD_TASK, false) == true
-        val categoryUri = intent?.getStringExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
+        if (intent == null) return
+        val wantsGlobalAdd = intent.getBooleanExtra(EXTRA_OPEN_ADD_TASK, false)
+        val fileRepository = (application as TodosianApplication).fileRepository
+        val categoryUri = intent.getStringExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
+            ?.takeIf { it.isNotBlank() }
+            ?.toUri()
+            ?.takeIf { fileRepository.isCategoryUri(it) }
+            ?.toString()
         if (wantsGlobalAdd || categoryUri != null) {
             addTaskSignal.value = AddTaskRequest(addTaskSignal.value.tick + 1L, categoryUri)
-            intent?.removeExtra(EXTRA_OPEN_ADD_TASK)
-            intent?.removeExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
+            intent.removeExtra(EXTRA_OPEN_ADD_TASK)
+            intent.removeExtra(EXTRA_OPEN_ADD_TASK_CATEGORY)
         }
     }
 
     companion object {
         const val EXTRA_OPEN_ADD_TASK = "open_add_task"
-        const val EXTRA_OPEN_ADD_TASK_CATEGORY = "open_add_task_list"
+        const val EXTRA_OPEN_ADD_TASK_CATEGORY = "open_add_task_category"
     }
 }
