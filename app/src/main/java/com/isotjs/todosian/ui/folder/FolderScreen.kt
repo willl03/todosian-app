@@ -84,7 +84,7 @@ import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.VaultContent
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
 import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
@@ -116,7 +116,7 @@ import kotlinx.coroutines.FlowPreview
 data class FolderUiState(
     val isLoading: Boolean = true,
     val folderName: String = "",
-    val lists: List<TodoList> = emptyList(),
+    val lists: List<Category> = emptyList(),
     /** True until the first count pass completes; rows show a placeholder instead of x/y. */
     val countsPending: Boolean = false,
     /** null = not loaded yet; used by the "move list to another folder" sheet. */
@@ -133,7 +133,7 @@ class FolderViewModel(
      * The folder's lists as scanned by the pager (names + order, no counts). Seeding them lets
      * the page render its rows instantly; the counts fill in with the first refresh.
      */
-    private val seededLists: List<TodoList> = emptyList(),
+    private val seededLists: List<Category> = emptyList(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -173,7 +173,7 @@ class FolderViewModel(
         val folderName = if (isUnfiled) "" else {
             fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
         }
-        val listsResult = fileRepository.getListsIn(folderUri, folderPath, includeCounts = true)
+        val listsResult = fileRepository.getCategoriesIn(folderUri, folderPath, includeCounts = true)
 
         _uiState.value = FolderUiState(
             isLoading = false,
@@ -187,9 +187,9 @@ class FolderViewModel(
         }
     }
 
-    fun createList(name: String) {
+    fun createCategory(name: String) {
         viewModelScope.launch {
-            val created = fileRepository.createList(folderUri, name)
+            val created = fileRepository.createCategory(folderUri, name)
             if (created.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -198,9 +198,9 @@ class FolderViewModel(
         }
     }
 
-    fun renameList(listUri: Uri, currentName: String, newName: String) {
+    fun renameCategory(categoryUri: Uri, currentName: String, newName: String) {
         viewModelScope.launch {
-            val result = fileRepository.renameList(listUri, folderPath, currentName, newName)
+            val result = fileRepository.renameCategory(categoryUri, folderPath, currentName, newName)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -209,9 +209,9 @@ class FolderViewModel(
         }
     }
 
-    fun deleteList(listUri: Uri) {
+    fun deleteCategory(categoryUri: Uri) {
         viewModelScope.launch {
-            val result = fileRepository.deleteList(listUri)
+            val result = fileRepository.deleteCategory(categoryUri)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -271,10 +271,10 @@ class FolderViewModel(
         }
     }
 
-    fun moveList(listUri: Uri, targetFolder: MoveFolderTarget) {
+    fun moveCategory(categoryUri: Uri, targetFolder: MoveFolderTarget) {
         viewModelScope.launch {
-            val result = fileRepository.moveList(
-                listUri = listUri,
+            val result = fileRepository.moveCategory(
+                categoryUri = categoryUri,
                 sourceParentUri = folderUri,
                 targetFolderUri = targetFolder.uri,
             )
@@ -304,7 +304,7 @@ class FolderViewModel(
 
         viewModelScope.launch {
             val names = lists.map { it.displayName }
-            val result = fileRepository.reorderLists(folderPath, names)
+            val result = fileRepository.reorderCategories(folderPath, names)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_reorder_failed))
                 refresh(showLoading = false)
@@ -589,10 +589,10 @@ private fun FolderPage(
     var showNewListSheet by remember { mutableStateOf(false) }
     var newListName by remember { mutableStateOf("") }
 
-    var renameTarget by remember { mutableStateOf<TodoList?>(null) }
+    var renameTarget by remember { mutableStateOf<Category?>(null) }
     var renameValue by remember { mutableStateOf("") }
-    var deleteTarget by remember { mutableStateOf<TodoList?>(null) }
-    var moveListTarget by remember { mutableStateOf<TodoList?>(null) }
+    var deleteTarget by remember { mutableStateOf<Category?>(null) }
+    var moveListTarget by remember { mutableStateOf<Category?>(null) }
 
     var showRenameFolderSheet by remember { mutableStateOf(false) }
     var renameFolderValue by remember { mutableStateOf("") }
@@ -650,7 +650,7 @@ private fun FolderPage(
                     }
                     TextButton(
                         onClick = {
-                            viewModel.createList(newListName)
+                            viewModel.createCategory(newListName)
                             scope.launch {
                                 newListSheetState.hide()
                                 showNewListSheet = false
@@ -726,7 +726,7 @@ private fun FolderPage(
                             val target = renameTarget
                             val normalized = validation.normalizedName
                             if (target != null && normalized != null) {
-                                viewModel.renameList(target.uri, currentName = target.displayName, newName = normalized)
+                                viewModel.renameCategory(target.uri, currentName = target.displayName, newName = normalized)
                             }
                             scope.launch {
                                 renameListSheetState.hide()
@@ -757,7 +757,7 @@ private fun FolderPage(
                 TextButton(
                     onClick = {
                         val target = deleteTarget
-                        if (target != null) viewModel.deleteList(target.uri)
+                        if (target != null) viewModel.deleteCategory(target.uri)
                         deleteTarget = null
                     },
                 ) {
@@ -844,7 +844,7 @@ private fun FolderPage(
                                 modifier = Modifier.clickable {
                                     val list = moveListTarget
                                     if (list != null) {
-                                        viewModel.moveList(list.uri, target)
+                                        viewModel.moveCategory(list.uri, target)
                                     }
                                     moveListTarget = null
                                 },
@@ -1156,7 +1156,7 @@ private fun FolderPage(
 
 @Composable
 private fun TodoListRow(
-    list: TodoList,
+    list: Category,
     onClick: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
@@ -1309,7 +1309,7 @@ private class FolderViewModelFactory(
     private val folderUri: Uri,
     private val isUnfiled: Boolean,
     private val folderPath: String,
-    private val seededLists: List<TodoList>,
+    private val seededLists: List<Category>,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FolderViewModel::class.java)) {

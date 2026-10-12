@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 data class DailyFocusTask(
     val todo: Todo,
-    val listUri: Uri,
+    val categoryUri: Uri,
     val listName: String,
 )
 
@@ -83,7 +83,7 @@ class DailyFocusViewModel(
             }
 
             val today = LocalDate.now().toString()
-            val listsResult = fileRepository.getAllLists(includeCounts = false)
+            val listsResult = fileRepository.getCategories(includeCounts = false)
             if (listsResult.isFailure) {
                 _uiState.value = DailyFocusUiState(isLoading = false)
                 return@launch
@@ -110,7 +110,7 @@ class DailyFocusViewModel(
                         tasks.add(
                             DailyFocusTask(
                                 todo = todo,
-                                listUri = list.uri,
+                                categoryUri = list.uri,
                                 listName = list.displayName,
                             ),
                         )
@@ -140,14 +140,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.listUri, newLines)
+            applyLines(task.categoryUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.listUri, newLines)
+                val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.listUri, previousLines)
+                        applyLines(task.categoryUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -182,14 +182,14 @@ class DailyFocusViewModel(
                 updated
             }
 
-            applyLines(task.listUri, newLines)
+            applyLines(task.categoryUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.listUri, newLines)
+                val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.listUri, previousLines)
+                        applyLines(task.categoryUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -209,14 +209,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.listUri, newLines)
+            applyLines(task.categoryUri, newLines)
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(task.listUri, newLines)
+                val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.listUri, previousLines)
+                        applyLines(task.categoryUri, previousLines)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -231,13 +231,13 @@ class DailyFocusViewModel(
     }
 
     private fun currentLinesFor(task: DailyFocusTask): List<String> =
-        _uiState.value.lineCache[task.listUri.toString()] ?: emptyList()
+        _uiState.value.lineCache[task.categoryUri.toString()] ?: emptyList()
 
     // Replicates the logic from refreshFromDisk but only for a single file, used for optimistic updates after mutations.
-    private fun applyLines(listUri: Uri, newLines: List<String>) {
+    private fun applyLines(categoryUri: Uri, newLines: List<String>) {
         val today = LocalDate.now().toString()
         val current = _uiState.value
-        val uriKey = listUri.toString()
+        val uriKey = categoryUri.toString()
 
         // Rebuild the cache with the updated file's lines.
         val newCache = current.lineCache.toMutableMap()
@@ -255,7 +255,7 @@ class DailyFocusViewModel(
                     tasks.add(
                         DailyFocusTask(
                             todo = todo,
-                            listUri = uri,
+                            categoryUri = uri,
                             listName = listName,
                         ),
                     )

@@ -154,7 +154,7 @@ object DueReminderNotifier {
                     else -> emptySequence()
                 }
             }
-            .filter { it.isFile && SafFileRepository.isListFileName(it.name) }
+            .filter { it.isFile && SafFileRepository.isCategoryFileName(it.name) }
             .toList()
 
         return listFiles

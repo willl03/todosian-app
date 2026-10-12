@@ -51,7 +51,7 @@ import androidx.lifecycle.lifecycleScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.ThemeMode
@@ -220,7 +220,7 @@ private fun WidgetConfigureScreen(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(fileRepository != null) }
-    var pickerRows by remember { mutableStateOf<List<PickerRow<TodoList>>>(emptyList()) }
+    var pickerRows by remember { mutableStateOf<List<PickerRow<Category>>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
         if (fileRepository == null) {
@@ -229,7 +229,7 @@ private fun WidgetConfigureScreen(
         }
         val content = fileRepository.getVaultContent(includeCounts = true)
             .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
-        pickerRows = buildPickerRows<TodoList>(
+        pickerRows = buildPickerRows<Category>(
             folders = content.folders.map { it.displayName to it.lists },
             unfiledLists = content.unfiledLists,
         )

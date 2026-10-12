@@ -25,7 +25,7 @@ class WidgetSnapshotTest {
         categoryUri: String = "content://category",
         categoryName: String = "Inbox",
     ) = WidgetTaskItem(
-        listUri = categoryUri,
+        categoryUri = categoryUri,
         listName = categoryName,
         todo = todo(text, isDone, lineIndex, dueDate),
     )

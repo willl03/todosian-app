@@ -10,7 +10,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.isotjs.todosian.data.model.Folder
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.utils.MarkdownParser
 import kotlinx.coroutines.CoroutineScope
@@ -45,11 +45,11 @@ interface FileRepository {
     suspend fun getVaultContent(includeCounts: Boolean): Result<VaultContent>
 
     /** Every list in the vault, flattened across folders (for widgets, daily focus, pickers). */
-    suspend fun getAllLists(includeCounts: Boolean): Result<List<TodoList>>
+    suspend fun getCategories(includeCounts: Boolean): Result<List<Category>>
 
     /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder),
      *  ordered by the manual order file for [parentPath] ("" = unfiled), then A–Z. */
-    suspend fun getListsIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<TodoList>>
+    suspend fun getCategoriesIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<Category>>
 
     suspend fun readLines(uri: Uri): Result<List<String>>
 
@@ -68,19 +68,19 @@ interface FileRepository {
 
     suspend fun deleteFolder(folderUri: Uri): Result<Unit>
 
-    suspend fun createList(parentUri: Uri, name: String): Result<Uri>
+    suspend fun createCategory(parentUri: Uri, name: String): Result<Uri>
 
     /** [parentPath]/[currentName] keep the manual order in sync (order-file entry renamed in place). */
-    suspend fun renameList(listUri: Uri, parentPath: String, currentName: String, newName: String): Result<Unit>
+    suspend fun renameCategory(categoryUri: Uri, parentPath: String, currentName: String, newName: String): Result<Unit>
 
-    suspend fun deleteList(listUri: Uri): Result<Unit>
+    suspend fun deleteCategory(categoryUri: Uri): Result<Unit>
 
     /**
      * Moves a list document into [targetFolderUri] (a folder URI, or the vault root for unfiled).
      * [sourceParentUri] is the list's current containing directory, or null when the caller cannot
      * provide it. Returns the list's URI after the move (SAF providers may issue a new one).
      */
-    suspend fun moveList(listUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri>
+    suspend fun moveCategory(categoryUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri>
 
     suspend fun moveTodoLine(sourceUri: Uri, targetUri: Uri, lineIndex: Int): Result<Unit>
 
@@ -93,7 +93,7 @@ interface FileRepository {
     suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit>
 
     /** Persists a manual list order for [parentPath] ("" = unfiled). */
-    suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit>
+    suspend fun reorderCategories(parentPath: String, orderedListNames: List<String>): Result<Unit>
 
     fun hasPersistedReadWritePermission(uri: Uri): Boolean
 
@@ -142,7 +142,7 @@ class SafFileRepository(
          * True when [name] is a Markdown list document the app should surface: a `.md` file that
          * is not a sync-conflict artifact. Pure so it can be unit tested.
          */
-        fun isListFileName(name: String?): Boolean {
+        fun isCategoryFileName(name: String?): Boolean {
             if (name == null) return false
             return name.endsWith(".md", ignoreCase = true) &&
                 !name.contains("sync-conflict", ignoreCase = true)
@@ -211,7 +211,7 @@ class SafFileRepository(
                             lists = dir.listFiles()
                                 .asSequence()
                                 .filter { it.isFile }
-                                .mapNotNull { parseListFile(it, includeCounts) }
+                                .mapNotNull { parseCategoryFile(it, includeCounts) }
                                 .toList(),
                         )
                     }
@@ -234,7 +234,7 @@ class SafFileRepository(
 
                 val unfiledLists = children.asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseListFile(it, includeCounts) }
+                    .mapNotNull { parseCategoryFile(it, includeCounts) }
                     .toList()
 
                 VaultContent(
@@ -249,11 +249,11 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getAllLists(includeCounts: Boolean): Result<List<TodoList>> {
+    override suspend fun getCategories(includeCounts: Boolean): Result<List<Category>> {
         return getVaultContent(includeCounts).mapCatching { it.allLists() }
     }
 
-    override suspend fun getListsIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<TodoList>> {
+    override suspend fun getCategoriesIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<Category>> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 // Works for both the vault root tree URI and a folder's document URI:
@@ -266,7 +266,7 @@ class SafFileRepository(
                 val lists = parent.listFiles()
                     .asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseListFile(it, includeCounts) }
+                    .mapNotNull { parseCategoryFile(it, includeCounts) }
                     .toList()
 
                 ListOrder.effective(
@@ -279,16 +279,16 @@ class SafFileRepository(
     }
 
     /**
-     * Reads and parses one `.md` document into a [TodoList]; null when it is not a list file.
+     * Reads and parses one `.md` document into a [Category]; null when it is not a list file.
      * With [includeCounts] = false the file is not opened at all and all counts stay 0 —
      * the names-only scans (home rows, pagers, pickers) get a full-speed pass.
      */
-    private fun parseListFile(file: DocumentFile, includeCounts: Boolean): TodoList? {
+    private fun parseCategoryFile(file: DocumentFile, includeCounts: Boolean): Category? {
         val name = file.name
-        if (!isListFileName(name)) return null
+        if (!isCategoryFileName(name)) return null
         val displayName = name.orEmpty().removeSuffix(".md")
         if (!includeCounts) {
-            return TodoList(
+            return Category(
                 displayName = displayName,
                 uri = file.uri,
                 todoCount = 0,
@@ -306,7 +306,7 @@ class SafFileRepository(
         val overdueCount = activeTodos.count { todo ->
             todo.dueDate?.let { it < today } == true
         }
-        return TodoList(
+        return Category(
             displayName = displayName,
             uri = file.uri,
             todoCount = todos.size,
@@ -442,7 +442,7 @@ class SafFileRepository(
         if (!ok) throw IllegalStateException("Unable to delete folder")
     }
 
-    override suspend fun createList(parentUri: Uri, name: String): Result<Uri> {
+    override suspend fun createCategory(parentUri: Uri, name: String): Result<Uri> {
         val cleaned = name.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
@@ -461,8 +461,8 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun renameList(
-        listUri: Uri,
+    override suspend fun renameCategory(
+        categoryUri: Uri,
         parentPath: String,
         currentName: String,
         newName: String,
@@ -480,7 +480,7 @@ class SafFileRepository(
                     .trim()
                     .let { base -> if (base.endsWith(".md", ignoreCase = true)) base else "$base.md" }
 
-                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, listUri, fileName)
+                val renamed = DocumentsContract.renameDocument(appContext.contentResolver, categoryUri, fileName)
                 if (renamed == null) throw IllegalStateException("Unable to rename document")
 
                 // Keep the manual order: rename the list's entry in its folder's section, in
@@ -493,10 +493,10 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun deleteList(listUri: Uri): Result<Unit> {
+    override suspend fun deleteCategory(categoryUri: Uri): Result<Unit> {
         return withContext(Dispatchers.IO) {
             runCatching {
-                val file = DocumentFile.fromSingleUri(appContext, listUri)
+                val file = DocumentFile.fromSingleUri(appContext, categoryUri)
                     ?: throw IllegalStateException("Invalid file URI")
                 val ok = file.delete()
                 if (!ok) throw IllegalStateException("Unable to delete file")
@@ -505,7 +505,7 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun moveList(listUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri> {
+    override suspend fun moveCategory(categoryUri: Uri, sourceParentUri: Uri?, targetFolderUri: Uri): Result<Uri> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 val treeUri = getFolderUri() ?: throw IllegalStateException("No folder selected")
@@ -513,7 +513,7 @@ class SafFileRepository(
 
                 val moved = DocumentsContract.moveDocument(
                     appContext.contentResolver,
-                    listUri,
+                    categoryUri,
                     parentDocumentUri(sourceParent),
                     parentDocumentUri(targetFolderUri),
                 )
@@ -521,7 +521,7 @@ class SafFileRepository(
 
                 // The move may have changed the document URI; keep widget bindings that point at
                 // the old URI working by rewriting them to the new one.
-                WidgetRefresher.remapSelection(appContext, oldUri = listUri, newUri = moved)
+                WidgetRefresher.remapSelection(appContext, oldUri = categoryUri, newUri = moved)
                 scheduleWidgetUpdate()
                 moved
             }
@@ -529,27 +529,27 @@ class SafFileRepository(
             // Some providers do not support moveDocument. Fall back to copy-then-delete, which
             // preserves the document content (all lines, including non-todo ones).
             Log.w(TAG, "moveDocument failed, falling back to copy+delete", error)
-            moveListByCopyDelete(listUri, targetFolderUri)
+            moveCategoryByCopyDelete(categoryUri, targetFolderUri)
         }
     }
 
     /** Fallback for providers without moveDocument: copy the content, then delete the original. */
-    private suspend fun moveListByCopyDelete(listUri: Uri, targetFolderUri: Uri): Uri {
-        val name = getDisplayName(listUri).getOrThrow().removeSuffix(".md")
+    private suspend fun moveCategoryByCopyDelete(categoryUri: Uri, targetFolderUri: Uri): Uri {
+        val name = getDisplayName(categoryUri).getOrThrow().removeSuffix(".md")
         if (name.isEmpty()) throw IllegalStateException("Unable to resolve list name")
 
-        val lines = readLines(listUri).getOrThrow()
-        val created = createList(targetFolderUri, name).getOrThrow()
+        val lines = readLines(categoryUri).getOrThrow()
+        val created = createCategory(targetFolderUri, name).getOrThrow()
         try {
             writeLines(created, lines).getOrThrow()
         } catch (e: Exception) {
             // Never leave a half-written copy behind; keep the original intact.
-            runCatching { deleteList(created) }
+            runCatching { deleteCategory(created) }
             throw e
         }
-        deleteList(listUri).getOrThrow()
+        deleteCategory(categoryUri).getOrThrow()
 
-        WidgetRefresher.remapSelection(appContext, oldUri = listUri, newUri = created)
+        WidgetRefresher.remapSelection(appContext, oldUri = categoryUri, newUri = created)
         scheduleWidgetUpdate()
         return created
     }
@@ -590,7 +590,7 @@ class SafFileRepository(
     override suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit> =
         writeOrder { it.withFolderOrder(orderedFolderPaths) }
 
-    override suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit> =
+    override suspend fun reorderCategories(parentPath: String, orderedListNames: List<String>): Result<Unit> =
         writeOrder { it.withListOrder(parentPath, orderedListNames) }
 
     /**
@@ -625,10 +625,10 @@ class SafFileRepository(
 
                 var count = 0
                 for (entry in root.listFiles()) {
-                    if (isListFileName(entry.name) && entry.isFile) {
+                    if (isCategoryFileName(entry.name) && entry.isFile) {
                         count++
                     } else if (entry.isDirectory && !isIgnoredEntryName(entry.name)) {
-                        count += entry.listFiles().count { it.isFile && isListFileName(it.name) }
+                        count += entry.listFiles().count { it.isFile && isCategoryFileName(it.name) }
                     }
                 }
                 count
@@ -677,7 +677,7 @@ class SafFileRepository(
                         // structural changes inside a folder (lists created/renamed/deleted)
                         uris.add(entry.uri to true)
                         uris.add(dirChildrenUri(entry.uri) to true)
-                    } else if (isListFileName(entry.name)) {
+                    } else if (isCategoryFileName(entry.name)) {
                         // content changes of a root-level (unfiled) list
                         uris.add(entry.uri to false)
                     }
@@ -686,7 +686,7 @@ class SafFileRepository(
                 for (entry in root.listFiles()) {
                     if (!entry.isDirectory || isIgnoredEntryName(entry.name)) continue
                     for (file in entry.listFiles()) {
-                        if (file.isFile && isListFileName(file.name)) {
+                        if (file.isFile && isCategoryFileName(file.name)) {
                             uris.add(file.uri to false)
                         }
                     }

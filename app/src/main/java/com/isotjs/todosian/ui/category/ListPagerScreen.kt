@@ -1,4 +1,4 @@
-package com.isotjs.todosian.ui.list
+package com.isotjs.todosian.ui.category
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -32,7 +32,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.TodosianEmptyState
@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 data class ListPagerUiState(
     val isLoading: Boolean = true,
     /** The lists of the containing folder, in pager order. */
-    val pages: List<TodoList> = emptyList(),
+    val pages: List<Category> = emptyList(),
     /** Order-file key of the containing folder: the folder name, "" for unfiled. */
     val parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled). */
@@ -57,29 +57,29 @@ data class ListPagerUiState(
 )
 
 /**
- * Swipeable pager over a folder's lists. Resolves the folder containing [listUri] itself, so
+ * Swipeable pager over a folder's lists. Resolves the folder containing [categoryUri] itself, so
  * widget intents can route straight into a list without knowing its folder. Swiping left/right
- * moves between the folder's lists; each page is a full [ListPage].
+ * moves between the folder's lists; each page is a full [CategoryScreen].
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ListPagerScreen(
     fileRepository: FileRepository,
     appSettingsRepository: AppSettingsRepository,
-    listUri: Uri,
+    categoryUri: Uri,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     autoOpenAddTodo: Boolean = false,
 ) {
     val pagerViewModel: ListPagerViewModel = viewModel(
-        factory = ListPagerViewModelFactory(fileRepository, listUri),
+        factory = ListPagerViewModelFactory(fileRepository, categoryUri),
     )
     val uiState by pagerViewModel.uiState.collectAsStateWithLifecycle()
 
     val pages = uiState.pages
     // Same as the folder pager: with a seed, land directly on the requested list.
     val pagerState = rememberPagerState(
-        initialPage = pages.indexOfFirst { it.uri == listUri }.coerceAtLeast(0),
+        initialPage = pages.indexOfFirst { it.uri == categoryUri }.coerceAtLeast(0),
         pageCount = { pages.size },
     )
 
@@ -87,7 +87,7 @@ fun ListPagerScreen(
     var landed by remember { mutableStateOf(false) }
     LaunchedEffect(pages, landed) {
         if (!landed && pages.isNotEmpty()) {
-            val index = pages.indexOfFirst { it.uri == listUri }
+            val index = pages.indexOfFirst { it.uri == categoryUri }
             if (index >= 0) pagerState.scrollToPage(index)
             landed = true
         }
@@ -135,12 +135,12 @@ fun ListPagerScreen(
         modifier = modifier.fillMaxSize(),
     ) { pageIndex ->
         val page = pages.getOrNull(pageIndex) ?: return@HorizontalPager
-        ListPage(
+        CategoryScreen(
             fileRepository = fileRepository,
             appSettingsRepository = appSettingsRepository,
-            listUri = page.uri,
+            categoryUri = page.uri,
             onBack = onBack,
-            autoOpenAddTodo = autoOpenAddTodo && page.uri == listUri,
+            autoOpenAddTodo = autoOpenAddTodo && page.uri == categoryUri,
             listPosition = pageIndex + 1,
             listCount = pages.size,
             parentPath = uiState.parentPath,
@@ -153,7 +153,7 @@ fun ListPagerScreen(
 
 class ListPagerViewModel(
     private val fileRepository: FileRepository,
-    private val listUri: Uri,
+    private val categoryUri: Uri,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListPagerUiState())
@@ -163,7 +163,7 @@ class ListPagerViewModel(
         observeVaultChanges()
         // Instant first frame: the folder page knows this folder's lists; the scan below
         // reconciles — the seed is a one-shot navigation argument.
-        val seed = NavSeed.consumeListPager(listUri)
+        val seed = NavSeed.consumeListPager(categoryUri)
         if (seed != null) {
             _uiState.value = ListPagerUiState(
                 isLoading = false,
@@ -192,12 +192,12 @@ class ListPagerViewModel(
         viewModelScope.launch {
             val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
             val containingFolder = content?.folders?.firstOrNull { folder ->
-                folder.lists.any { it.uri == listUri }
+                folder.lists.any { it.uri == categoryUri }
             }
             val pages = when {
                 containingFolder != null -> containingFolder.lists
                 // Not inside any folder: either an unfiled (root-level) list or a deleted one.
-                content?.unfiledLists?.any { it.uri == listUri } == true -> content.unfiledLists
+                content?.unfiledLists?.any { it.uri == categoryUri } == true -> content.unfiledLists
                 else -> emptyList()
             }
             _uiState.value = ListPagerUiState(
@@ -213,12 +213,12 @@ class ListPagerViewModel(
 
 private class ListPagerViewModelFactory(
     private val fileRepository: FileRepository,
-    private val listUri: Uri,
+    private val categoryUri: Uri,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListPagerViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ListPagerViewModel(fileRepository, listUri) as T
+            return ListPagerViewModel(fileRepository, categoryUri) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

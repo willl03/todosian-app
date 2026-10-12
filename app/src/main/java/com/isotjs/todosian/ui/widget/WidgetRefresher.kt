@@ -19,7 +19,7 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Todo
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.utils.MarkdownParser
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -87,10 +87,10 @@ internal fun resolveCategoryKey(
  * back to the stored display name (e.g. when the document URI changed). Returns null for the
  * "All lists" selection, or when the selected list no longer exists.
  */
-internal fun resolveSelectedList(
-    categories: List<TodoList>,
+internal fun resolveSelectedCategory(
+    categories: List<Category>,
     selection: WidgetSelection,
-): TodoList? {
+): Category? {
     if (selection.isAllLists) return null
     val resolvedKey = resolveCategoryKey(
         categoryKeys = categories.map { it.uri.toString() to it.displayName },
@@ -143,7 +143,7 @@ internal data class WidgetSnapshot(
         prefs[MISSING_LIST_KEY] = missingList
         items.forEachIndexed { index, item ->
             val prefix = "$ITEM_KEY_PREFIX$index."
-            prefs[stringPreferencesKey("${prefix}category_uri")] = item.listUri
+            prefs[stringPreferencesKey("${prefix}category_uri")] = item.categoryUri
             prefs[stringPreferencesKey("${prefix}category_name")] = item.listName
             prefs[stringPreferencesKey("${prefix}text")] = item.todo.text
             prefs[intPreferencesKey("${prefix}line_index")] = item.todo.lineIndex
@@ -173,7 +173,7 @@ internal data class WidgetSnapshot(
                 val dueDate = prefs[stringPreferencesKey("${prefix}due_date")]
                 items.add(
                     WidgetTaskItem(
-                        listUri = categoryUri,
+                        categoryUri = categoryUri,
                         listName = prefs[stringPreferencesKey("${prefix}category_name")] ?: "",
                         todo = Todo(
                             // `id` is a per-parse random UUID and is not part of the snapshot.
@@ -234,7 +234,7 @@ object WidgetRefresher {
         }
 
         refreshMutex.withLock {
-            val categories = fileRepository.getAllLists(includeCounts = true).getOrDefault(emptyList())
+            val categories = fileRepository.getCategories(includeCounts = true).getOrDefault(emptyList())
             val widgetStates = glanceIds.map { glanceId ->
                 runCatching {
                     getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
@@ -250,7 +250,7 @@ object WidgetRefresher {
             val neededUris = buildList {
                 if (selections.any { it.isAllLists }) categories.forEach { add(it.uri) }
                 selections.forEach { selection ->
-                    resolveSelectedList(categories, selection)?.let { add(it.uri) }
+                    resolveSelectedCategory(categories, selection)?.let { add(it.uri) }
                 }
             }.toSet()
             val linesByUri = neededUris.associateWith { uri ->
@@ -326,12 +326,12 @@ object WidgetRefresher {
      */
     private fun buildSnapshot(
         hasFolder: Boolean,
-        categories: List<TodoList>,
+        categories: List<Category>,
         linesByUri: Map<Uri, List<String>>,
         selection: WidgetSelection,
         showCompleted: Boolean,
     ): WidgetSnapshot {
-        val resolved = resolveSelectedList(categories, selection)
+        val resolved = resolveSelectedCategory(categories, selection)
 
         if (selection.categoryUri != null && resolved == null) {
             // The bound list was renamed or deleted; keep the title so the user knows which
@@ -352,7 +352,7 @@ object WidgetRefresher {
             val lines = linesByUri[category.uri].orEmpty()
             MarkdownParser.parse(lines).map { todo ->
                 WidgetTaskItem(
-                    listUri = category.uri.toString(),
+                    categoryUri = category.uri.toString(),
                     listName = category.displayName,
                     todo = todo,
                 )

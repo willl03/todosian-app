@@ -10,43 +10,43 @@ import org.junit.Test
  */
 class FileRepositoryHelpersTest {
 
-    // region isListFileName (Markdown list documents)
+    // region isCategoryFileName (Markdown list documents)
 
     @Test
     fun `lowercase md file is a list`() {
-        assertTrue(SafFileRepository.isListFileName("Inbox.md"))
+        assertTrue(SafFileRepository.isCategoryFileName("Inbox.md"))
     }
 
     @Test
     fun `uppercase md extension is a list`() {
-        assertTrue(SafFileRepository.isListFileName("Inbox.MD"))
-        assertTrue(SafFileRepository.isListFileName("Inbox.Md"))
-        assertTrue(SafFileRepository.isListFileName("Inbox.mD"))
+        assertTrue(SafFileRepository.isCategoryFileName("Inbox.MD"))
+        assertTrue(SafFileRepository.isCategoryFileName("Inbox.Md"))
+        assertTrue(SafFileRepository.isCategoryFileName("Inbox.mD"))
     }
 
     @Test
     fun `non-markdown file is not a list`() {
-        assertFalse(SafFileRepository.isListFileName("notes.txt"))
-        assertFalse(SafFileRepository.isListFileName("image.png"))
-        assertFalse(SafFileRepository.isListFileName("archive.md.bak"))
-        assertFalse(SafFileRepository.isListFileName("no-extension"))
+        assertFalse(SafFileRepository.isCategoryFileName("notes.txt"))
+        assertFalse(SafFileRepository.isCategoryFileName("image.png"))
+        assertFalse(SafFileRepository.isCategoryFileName("archive.md.bak"))
+        assertFalse(SafFileRepository.isCategoryFileName("no-extension"))
     }
 
     @Test
     fun `sync-conflict files are never lists`() {
-        assertFalse(SafFileRepository.isListFileName("sync-conflict-Inbox.md"))
-        assertFalse(SafFileRepository.isListFileName("Inbox (sync-conflict).md"))
-        assertFalse(SafFileRepository.isListFileName("SYNC-CONFLICT.md"))
+        assertFalse(SafFileRepository.isCategoryFileName("sync-conflict-Inbox.md"))
+        assertFalse(SafFileRepository.isCategoryFileName("Inbox (sync-conflict).md"))
+        assertFalse(SafFileRepository.isCategoryFileName("SYNC-CONFLICT.md"))
     }
 
     @Test
     fun `null name is not a list`() {
-        assertFalse(SafFileRepository.isListFileName(null))
+        assertFalse(SafFileRepository.isCategoryFileName(null))
     }
 
     @Test
     fun `unicode and emoji file names are lists`() {
-        assertTrue(SafFileRepository.isListFileName("Ünïcodé 🎉.md"))
+        assertTrue(SafFileRepository.isCategoryFileName("Ünïcodé 🎉.md"))
     }
 
     // endregion

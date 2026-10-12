@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,10 +18,10 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val isLoading: Boolean = false,
     val folders: List<Folder> = emptyList(),
-    val unfiledLists: List<TodoList> = emptyList(),
+    val unfiledLists: List<Category> = emptyList(),
 ) {
     /** Every list in the vault; drives the Daily focus counters. */
-    val allLists: List<TodoList> get() = unfiledLists + folders.flatMap { it.lists }
+    val allLists: List<Category> get() = unfiledLists + folders.flatMap { it.lists }
 
     fun remainingFor(mode: com.isotjs.todosian.data.settings.DailyFocusMode): Int {
         return when (mode) {

@@ -25,7 +25,7 @@ import com.isotjs.todosian.ui.addtask.AddTaskScreen
 import com.isotjs.todosian.ui.folder.FolderScreen
 import com.isotjs.todosian.ui.dailyfocus.DailyFocusScreen
 import com.isotjs.todosian.ui.home.HomeScreen
-import com.isotjs.todosian.ui.list.ListPagerScreen
+import com.isotjs.todosian.ui.category.ListPagerScreen
 import com.isotjs.todosian.ui.onboarding.OnboardingScreen
 import com.isotjs.todosian.ui.settings.SettingsScreen
 import kotlinx.coroutines.flow.StateFlow
@@ -43,8 +43,8 @@ fun TodosianApp(
     val startDestination = remember(fileRepository, addTaskRequest) {
         when {
             fileRepository.getFolderUri() == null -> Routes.Onboarding
-            addTaskRequest.tick > 0L && addTaskRequest.listUri != null ->
-                Routes.list(Uri.parse(addTaskRequest.listUri), addTodo = true)
+            addTaskRequest.tick > 0L && addTaskRequest.categoryUri != null ->
+                Routes.category(Uri.parse(addTaskRequest.categoryUri), addTodo = true)
             addTaskRequest.tick > 0L -> Routes.AddTask
             else -> Routes.Home
         }
@@ -55,12 +55,12 @@ fun TodosianApp(
         if (request.tick > 0L && fileRepository.getFolderUri() != null) {
             val destination = navController.currentDestination?.route
             when {
-                request.listUri != null && destination != Routes.ListPager ->
+                request.categoryUri != null && destination != Routes.ListPager ->
                     navController.navigate(
-                        Routes.list(Uri.parse(request.listUri), addTodo = true),
+                        Routes.category(Uri.parse(request.categoryUri), addTodo = true),
                     ) { launchSingleTop = true }
 
-                request.listUri == null && destination != Routes.AddTask ->
+                request.categoryUri == null && destination != Routes.AddTask ->
                     navController.navigate(Routes.AddTask) { launchSingleTop = true }
             }
         }
@@ -188,8 +188,8 @@ fun TodosianApp(
                 fileRepository = fileRepository,
                 folderUri = folderUri,
                 isUnfiled = isUnfiled,
-                onOpenList = { listUri ->
-                    navController.navigate(Routes.list(listUri))
+                onOpenList = { categoryUri ->
+                    navController.navigate(Routes.category(categoryUri))
                 },
                 onBack = {
                     navController.previousBackStackEntry?.savedStateHandle?.set(
@@ -204,22 +204,22 @@ fun TodosianApp(
         composable(
             route = Routes.ListPager,
             arguments = listOf(
-                navArgument(Routes.ARG_LIST_URI) {
+                navArgument(Routes.ARG_CATEGORY_URI) {
                     type = NavType.StringType
                 },
-                navArgument(Routes.ARG_LIST_ADD) {
+                navArgument(Routes.ARG_CATEGORY_ADD) {
                     type = NavType.BoolType
                     defaultValue = false
                 },
             ),
         ) { backStackEntry ->
-            val encoded = backStackEntry.arguments?.getString(Routes.ARG_LIST_URI).orEmpty()
-            val listUri = encoded.toUri()
-            val autoOpenAddTodo = backStackEntry.arguments?.getBoolean(Routes.ARG_LIST_ADD) ?: false
+            val encoded = backStackEntry.arguments?.getString(Routes.ARG_CATEGORY_URI).orEmpty()
+            val categoryUri = encoded.toUri()
+            val autoOpenAddTodo = backStackEntry.arguments?.getBoolean(Routes.ARG_CATEGORY_ADD) ?: false
             ListPagerScreen(
                 fileRepository = fileRepository,
                 appSettingsRepository = appSettingsRepository,
-                listUri = listUri,
+                categoryUri = categoryUri,
                 autoOpenAddTodo = autoOpenAddTodo,
                 onBack = {
                     navController.previousBackStackEntry?.savedStateHandle?.set(
@@ -235,7 +235,7 @@ fun TodosianApp(
             AddTaskScreen(
                 fileRepository = fileRepository,
                 onSelectList = { uri ->
-                    navController.navigate(Routes.list(uri, addTodo = true))
+                    navController.navigate(Routes.category(uri, addTodo = true))
                 },
                 onBack = {
                     navController.previousBackStackEntry?.savedStateHandle?.set(
@@ -273,10 +273,12 @@ object Routes {
     fun folder(folderUri: Uri, isUnfiled: Boolean = false): String =
         "folder/${Uri.encode(folderUri.toString())}?$ARG_FOLDER_UNFILED=$isUnfiled"
 
-    const val ARG_LIST_URI = "listUri"
-    const val ARG_LIST_ADD = "add"
-    const val ListPager = "list/{$ARG_LIST_URI}?$ARG_LIST_ADD={$ARG_LIST_ADD}"
+    const val ARG_CATEGORY_URI = "categoryUri"
+    const val ARG_CATEGORY_ADD = "add"
+    // Named after upstream's Routes.Category, but in this fork the destination is the pager.
+    const val ListPager = "list/{$ARG_CATEGORY_URI}?$ARG_CATEGORY_ADD={$ARG_CATEGORY_ADD}"
 
-    fun list(listUri: Uri, addTodo: Boolean = false): String =
-        "list/${Uri.encode(listUri.toString())}?$ARG_LIST_ADD=$addTodo"
+    // Same call shape as upstream's Routes.category(uri, addTodo); routes into the pager.
+    fun category(categoryUri: Uri, addTodo: Boolean = false): String =
+        "list/${Uri.encode(categoryUri.toString())}?$ARG_CATEGORY_ADD=$addTodo"
 }

@@ -1,4 +1,4 @@
-package com.isotjs.todosian.ui.list
+package com.isotjs.todosian.ui.category
 
 import android.net.Uri
 import androidx.compose.animation.core.Spring
@@ -108,10 +108,10 @@ import java.time.LocalDate
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun ListPage(
+fun CategoryScreen(
     fileRepository: FileRepository,
     appSettingsRepository: AppSettingsRepository,
-    listUri: Uri,
+    categoryUri: Uri,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     autoOpenAddTodo: Boolean = false,
@@ -126,11 +126,11 @@ fun ListPage(
     /** List name from the pager scan; seeds the title before the file is read. */
     seededTitle: String = "",
 ) {
-    val viewModel: ListViewModel = viewModel(
-        key = "list_$listUri",
-        factory = ListViewModelFactory(
+    val viewModel: CategoryViewModel = viewModel(
+        key = "list_$categoryUri",
+        factory = CategoryViewModelFactory(
             fileRepository = fileRepository,
-            listUri = listUri,
+            categoryUri = categoryUri,
             parentPath = parentPath,
             parentFolderUri = parentFolderUri,
             seededTitle = seededTitle,
@@ -156,7 +156,7 @@ fun ListPage(
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                is ListViewModel.Event.ShowMessage -> {
+                is CategoryViewModel.Event.ShowMessage -> {
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
                 }
             }
@@ -540,7 +540,7 @@ fun ListPage(
                     }
                     TextButton(
                         onClick = {
-                            viewModel.renameList(renameListValue)
+                            viewModel.renameCategory(renameListValue)
                             scope.launch {
                                 renameListSheetState.hide()
                                 showRenameListSheet = false
@@ -569,7 +569,7 @@ fun ListPage(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteList()
+                        viewModel.deleteCategory()
                         showDeleteListDialog = false
                     },
                 ) {
@@ -654,7 +654,7 @@ fun ListPage(
                                     )
                                 },
                                 modifier = Modifier.clickable {
-                                    viewModel.moveList(target)
+                                    viewModel.moveCategory(target)
                                     showMoveListSheet = false
                                 },
                             )
@@ -985,17 +985,17 @@ fun ListPage(
     }
 }
 
-class ListViewModelFactory(
+class CategoryViewModelFactory(
     private val fileRepository: FileRepository,
-    private val listUri: Uri,
+    private val categoryUri: Uri,
     private val parentPath: String = "",
     private val parentFolderUri: Uri? = null,
     private val seededTitle: String = "",
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(CategoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ListViewModel(fileRepository, listUri, parentPath, parentFolderUri, seededTitle) as T
+            return CategoryViewModel(fileRepository, categoryUri, parentPath, parentFolderUri, seededTitle) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

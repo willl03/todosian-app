@@ -32,7 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
@@ -46,10 +46,10 @@ fun AddTaskScreen(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(true) }
-    var lists by remember { mutableStateOf<List<TodoList>>(emptyList()) }
+    var lists by remember { mutableStateOf<List<Category>>(emptyList()) }
 
     LaunchedEffect(fileRepository) {
-        lists = fileRepository.getAllLists(includeCounts = false).getOrDefault(emptyList())
+        lists = fileRepository.getCategories(includeCounts = false).getOrDefault(emptyList())
         isLoading = false
     }
 

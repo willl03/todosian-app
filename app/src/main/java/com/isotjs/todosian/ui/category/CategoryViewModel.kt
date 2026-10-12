@@ -1,4 +1,4 @@
-package com.isotjs.todosian.ui.list
+package com.isotjs.todosian.ui.category
 
 import android.net.Uri
 import androidx.annotation.StringRes
@@ -39,9 +39,9 @@ data class MoveTarget(
     val uri: Uri,
 )
 
-class ListViewModel(
+class CategoryViewModel(
     private val fileRepository: FileRepository,
-    private val listUri: Uri,
+    private val categoryUri: Uri,
     /** Order-file key of the containing folder: the folder name, "" for unfiled. */
     private val parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled); the move source. */
@@ -68,7 +68,7 @@ class ListViewModel(
     private fun observeExternalChanges() {
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
-            fileRepository.observeDocumentChanges(listUri)
+            fileRepository.observeDocumentChanges(categoryUri)
                 .debounce(250)
                 .catch {
                     // TODO: Pull to refresh.
@@ -91,10 +91,10 @@ class ListViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
-            val nameResult = fileRepository.getDisplayName(listUri)
+            val nameResult = fileRepository.getDisplayName(categoryUri)
             val title = nameResult.getOrNull()?.removeSuffix(".md").orEmpty()
 
-            val linesResult = fileRepository.readLines(listUri)
+            val linesResult = fileRepository.readLines(categoryUri)
             if (linesResult.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
                 _uiState.value = _uiState.value.copy(isLoading = false, title = title)
@@ -124,9 +124,9 @@ class ListViewModel(
 
         _uiState.value = state.copy(isLoadingMoveTargets = true)
         viewModelScope.launch {
-            val targets = fileRepository.getAllLists(includeCounts = false)
+            val targets = fileRepository.getCategories(includeCounts = false)
                 .getOrElse { emptyList() }
-                .filterNot { it.uri == listUri }
+                .filterNot { it.uri == categoryUri }
                 .map { MoveTarget(title = it.displayName, uri = it.uri) }
                 .sortedBy { it.title.lowercase() }
 
@@ -141,10 +141,10 @@ class ListViewModel(
      * Renames this list from inside the pager. The rename changes the document URI; the pager
      * re-scans and rebuilds the page, so no local refresh is attempted here.
      */
-    fun renameList(newName: String) {
+    fun renameCategory(newName: String) {
         viewModelScope.launch {
             val currentName = _uiState.value.title
-            val result = fileRepository.renameList(listUri, parentPath, currentName, newName)
+            val result = fileRepository.renameCategory(categoryUri, parentPath, currentName, newName)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
             }
@@ -152,9 +152,9 @@ class ListViewModel(
     }
 
     /** Deletes this list; the pager drops the page on the next vault re-scan. */
-    fun deleteList() {
+    fun deleteCategory() {
         viewModelScope.launch {
-            val result = fileRepository.deleteList(listUri)
+            val result = fileRepository.deleteCategory(categoryUri)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
             }
@@ -184,13 +184,13 @@ class ListViewModel(
     }
 
     /** Moves this whole list to another folder; the pager drops the page on the next re-scan. */
-    fun moveList(target: MoveFolderTarget) {
+    fun moveCategory(target: MoveFolderTarget) {
         viewModelScope.launch {
             val source = parentFolderUri
             val result = if (source == null) {
                 Result.failure(IllegalStateException("No source folder"))
             } else {
-                fileRepository.moveList(listUri = listUri, sourceParentUri = source, targetFolderUri = target.uri)
+                fileRepository.moveCategory(categoryUri = categoryUri, sourceParentUri = source, targetFolderUri = target.uri)
             }
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
@@ -219,7 +219,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(listUri, newLines)
+                val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -253,7 +253,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(listUri, newLines)
+                val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -291,7 +291,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(listUri, newLines)
+                val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -334,7 +334,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(listUri, newLines)
+                val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -361,7 +361,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val write = fileRepository.writeLines(listUri, newLines)
+                val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -392,7 +392,7 @@ class ListViewModel(
 
             inFlightWrites.incrementAndGet()
             try {
-                val result = fileRepository.moveTodoLine(listUri, targetUri, todo.lineIndex)
+                val result = fileRepository.moveTodoLine(categoryUri, targetUri, todo.lineIndex)
                 if (result.isFailure) {
                     if (_uiState.value.lines == newLines) {
                         applyLines(previousLines)
@@ -411,7 +411,7 @@ class ListViewModel(
         viewModelScope.launch {
             inFlightWrites.incrementAndGet()
             try {
-                val result = fileRepository.copyTodoLine(listUri, targetUri, todo.lineIndex)
+                val result = fileRepository.copyTodoLine(categoryUri, targetUri, todo.lineIndex)
                 if (result.isFailure) {
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 } else {

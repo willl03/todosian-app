@@ -43,7 +43,7 @@ class OnboardingViewModel(
                 return@launch
             }
 
-            val lists = fileRepository.getAllLists(includeCounts = false)
+            val lists = fileRepository.getCategories(includeCounts = false)
             if (lists.isFailure) {
                 fileRepository.clearFolderUri()
                 _uiState.value = OnboardingUiState(

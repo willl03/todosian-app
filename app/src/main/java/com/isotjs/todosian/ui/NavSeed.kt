@@ -1,7 +1,7 @@
 package com.isotjs.todosian.ui
 
 import android.net.Uri
-import com.isotjs.todosian.data.model.TodoList
+import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
 
 /**
@@ -56,5 +56,5 @@ object NavSeed {
 data class ListPagerSeed(
     val parentPath: String,
     val parentFolderUri: Uri,
-    val lists: List<TodoList>,
+    val lists: List<Category>,
 )

@@ -299,7 +299,7 @@ fun DailyFocusScreen(
                 }
                 items(
                     items = tasksInGroup,
-                    key = { "${it.listUri}:${it.todo.id}" },
+                    key = { "${it.categoryUri}:${it.todo.id}" },
                 ) { task ->
                     TodoRow(
                         todo = task.todo,
