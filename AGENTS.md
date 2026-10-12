@@ -66,6 +66,7 @@ Note: the app works with any folder you pick via SAF. Many users point it at an 
 6. If you have any doubts ask a human contributor. Never make assumptions about the requirements or implementation details without clarification.
 7. If you do not test your changes using the instructions in the next section, you will be faced with reprimands from human contributors and may be asked to redo your work. Always ensure that you test your changes thoroughly before asking for a final review.
 8. You are absolutely **not allowed to bump the version** of the app in ANY way. Version bumps are only done by the core development team after manual review.
+9. **adb access is revoked.** Never interact with a connected device: no installs, screencaps, screen recordings, logcat, or shell commands on the device. Instead, after finishing a build, provide the exact `adb install` command for the human to run themselves and let them report the results back.
 
 ## Building and testing your changes
 
