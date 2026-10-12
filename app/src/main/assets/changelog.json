@@ -19,6 +19,11 @@
         "description": "The widget picker mirrors the folder structure, task rows show their priority, and widgets no longer repeat the list name under every entry."
       },
       {
+        "icon": "SubdirectoryArrowRight",
+        "title": "Sections, Not Screens",
+        "description": "Tapping a folder now opens its sections directly — a fixed folder bar on top with the folder menu, and each section's own bar swiping underneath. The folder view remains available through Reorder sections, where new sections can be created too."
+      },
+      {
         "icon": "Checklist",
         "title": "Show or Hide Completed",
         "description": "A quick toggle in every list's menu shows or hides completed tasks without leaving the screen."
