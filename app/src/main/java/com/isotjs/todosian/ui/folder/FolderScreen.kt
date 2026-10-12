@@ -1089,6 +1089,7 @@ private fun FolderPage(
             }
 
             else -> {
+                Column(modifier = Modifier.fillMaxSize()) {
         val listState = rememberLazyListState()
         val dragState = remember(listState) {
             DragReorderState(
@@ -1103,7 +1104,7 @@ private fun FolderPage(
             state = listState,
             contentPadding = PaddingValues(bottom = 96.dp),
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
         ) {
             itemsIndexed(
@@ -1147,6 +1148,19 @@ private fun FolderPage(
                     DragReorderIndicatorSlot(dragState, rowKey, below = true)
                 }
             }
+        }
+
+        // Subtle always-visible hint: the reorder gesture is a long-press drag, which has no
+        // other visual affordance on the rows.
+        Text(
+            text = stringResource(R.string.folder_reorder_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+        )
         }
         }
         }
