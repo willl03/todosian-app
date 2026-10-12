@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
+import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.utils.MarkdownParser
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,6 +30,8 @@ data class ListUiState(
     val lines: List<String> = emptyList(),
     val moveTargets: List<MoveTarget>? = null,
     val isLoadingMoveTargets: Boolean = false,
+    /** Folder destinations for moving this whole list; null = not loaded yet. */
+    val moveFolderTargets: List<MoveFolderTarget>? = null,
 )
 
 data class MoveTarget(
@@ -39,6 +42,10 @@ data class MoveTarget(
 class ListViewModel(
     private val fileRepository: FileRepository,
     private val listUri: Uri,
+    /** Order-file key of the containing folder: the folder name, "" for unfiled. */
+    private val parentPath: String = "",
+    /** Document URI of the containing folder (vault root for unfiled); the move source. */
+    private val parentFolderUri: Uri? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListUiState(isLoading = true))
@@ -122,6 +129,70 @@ class ListViewModel(
                 moveTargets = targets,
                 isLoadingMoveTargets = false,
             )
+        }
+    }
+
+    /**
+     * Renames this list from inside the pager. The rename changes the document URI; the pager
+     * re-scans and rebuilds the page, so no local refresh is attempted here.
+     */
+    fun renameList(newName: String) {
+        viewModelScope.launch {
+            val currentName = _uiState.value.title
+            val result = fileRepository.renameList(listUri, parentPath, currentName, newName)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            }
+        }
+    }
+
+    /** Deletes this list; the pager drops the page on the next vault re-scan. */
+    fun deleteList() {
+        viewModelScope.launch {
+            val result = fileRepository.deleteList(listUri)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            }
+        }
+    }
+
+    fun loadMoveFolderTargets() {
+        val state = _uiState.value
+        if (state.moveFolderTargets != null) return
+
+        viewModelScope.launch {
+            val content = fileRepository.getVaultContent().getOrNull()
+            val rootUri = fileRepository.getFolderUri()
+            val targets = buildList {
+                // Unfiled is a destination for every folder's lists, but not for unfiled itself.
+                if (parentPath.isNotEmpty() && !content?.unfiledLists.isNullOrEmpty()) {
+                    add(MoveFolderTarget(displayName = "", uri = rootUri ?: Uri.EMPTY, isUnfiled = true))
+                }
+                content?.folders?.forEach { folder ->
+                    if (folder.uri != parentFolderUri) {
+                        add(MoveFolderTarget(folder.displayName, folder.uri))
+                    }
+                }
+            }
+            _uiState.value = _uiState.value.copy(moveFolderTargets = targets)
+        }
+    }
+
+    /** Moves this whole list to another folder; the pager drops the page on the next re-scan. */
+    fun moveList(target: MoveFolderTarget) {
+        viewModelScope.launch {
+            val source = parentFolderUri
+            val result = if (source == null) {
+                Result.failure(IllegalStateException("No source folder"))
+            } else {
+                fileRepository.moveList(listUri = listUri, sourceParentUri = source, targetFolderUri = target.uri)
+            }
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            } else {
+                _events.emit(Event.ShowMessage(R.string.folder_move_list_success))
+            }
+            _uiState.value = _uiState.value.copy(moveFolderTargets = null)
         }
     }
 

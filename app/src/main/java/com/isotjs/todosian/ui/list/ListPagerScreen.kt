@@ -47,8 +47,12 @@ import kotlinx.coroutines.launch
 
 data class ListPagerUiState(
     val isLoading: Boolean = true,
-    /** The lists of the containing folder, in pager order (A–Z). */
+    /** The lists of the containing folder, in pager order. */
     val pages: List<TodoList> = emptyList(),
+    /** Order-file key of the containing folder: the folder name, "" for unfiled. */
+    val parentPath: String = "",
+    /** Document URI of the containing folder (vault root for unfiled). */
+    val parentFolderUri: Uri? = null,
 )
 
 /**
@@ -74,14 +78,6 @@ fun ListPagerScreen(
     val pages = uiState.pages
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
-    // Track which list the user is currently looking at so re-scans (renames, external changes)
-    // can keep the pager on the same list instead of jumping back to the entry page.
-    var currentListUri by remember { mutableStateOf(listUri) }
-    LaunchedEffect(pagerState.currentPage, pages) {
-        val page = pages.getOrNull(pagerState.currentPage)
-        if (page != null) currentListUri = page.uri
-    }
-
     // First time the pages arrive, land on the requested list.
     var landed by remember { mutableStateOf(false) }
     LaunchedEffect(pages, landed) {
@@ -89,14 +85,6 @@ fun ListPagerScreen(
             val index = pages.indexOfFirst { it.uri == listUri }
             if (index >= 0) pagerState.scrollToPage(index)
             landed = true
-        }
-    }
-
-    // If the current list disappears from its folder (moved elsewhere or deleted externally),
-    // leave this screen rather than showing a stale page.
-    LaunchedEffect(pages) {
-        if (!uiState.isLoading && pages.isNotEmpty() && pages.none { it.uri == currentListUri }) {
-            onBack()
         }
     }
 
@@ -150,6 +138,8 @@ fun ListPagerScreen(
             autoOpenAddTodo = autoOpenAddTodo && page.uri == listUri,
             listPosition = pageIndex + 1,
             listCount = pages.size,
+            parentPath = uiState.parentPath,
+            parentFolderUri = uiState.parentFolderUri,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -193,7 +183,13 @@ class ListPagerViewModel(
                 content?.unfiledLists?.any { it.uri == listUri } == true -> content.unfiledLists
                 else -> emptyList()
             }
-            _uiState.value = ListPagerUiState(isLoading = false, pages = pages)
+            _uiState.value = ListPagerUiState(
+                isLoading = false,
+                pages = pages,
+                parentPath = containingFolder?.displayName ?: "",
+                parentFolderUri = containingFolder?.uri
+                    ?: if (pages.isNotEmpty()) fileRepository.getFolderUri() else null,
+            )
         }
     }
 }

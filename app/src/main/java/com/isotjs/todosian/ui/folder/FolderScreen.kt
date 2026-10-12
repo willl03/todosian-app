@@ -81,6 +81,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
+import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
 import com.isotjs.todosian.ui.components.DragReorderState
@@ -214,6 +215,31 @@ class FolderViewModel(
         }
     }
 
+    /** Renames this folder from inside the pager; the pager rescans pages on success. */
+    fun renameFolder(newName: String) {
+        viewModelScope.launch {
+            val currentName = _uiState.value.folderName.ifBlank { folderPath }
+            val result = fileRepository.renameFolder(folderUri, currentName, newName)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            } else {
+                _events.emit(Event.FolderRenamed)
+            }
+        }
+    }
+
+    /** Deletes this folder (and its lists) from inside the pager; the UI backs out on success. */
+    fun deleteFolder() {
+        viewModelScope.launch {
+            val result = fileRepository.deleteFolder(folderUri)
+            if (result.isFailure) {
+                _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            } else {
+                _events.emit(Event.FolderDeleted)
+            }
+        }
+    }
+
     fun moveList(listUri: Uri, targetFolder: MoveFolderTarget) {
         viewModelScope.launch {
             val result = fileRepository.moveList(
@@ -257,6 +283,8 @@ class FolderViewModel(
 
     sealed interface Event {
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
+        data object FolderRenamed : Event
+        data object FolderDeleted : Event
     }
 }
 
@@ -296,31 +324,48 @@ class FolderPagerViewModel(
     )
     val vaultChanges: SharedFlow<Unit> = vaultChangesInternal.asSharedFlow()
 
+    /** Whether the unfiled page belongs to this visit; frozen after the first scan. */
+    private var includeUnfiled: Boolean? = null
+
     init {
         observeVaultChanges()
-        viewModelScope.launch {
-            val content = fileRepository.getVaultContent().getOrNull()
-            val rootUri = fileRepository.getFolderUri()
-            if (content == null || rootUri == null) {
-                _uiState.value = FolderPagerUiState(isLoading = false)
-                return@launch
-            }
+        viewModelScope.launch { scanPages() }
+    }
 
-            val pages = content.folders.toMutableList()
-            // "Unfiled lists" is the rightmost page; only present when it holds lists (or when
-            // the user is currently inside it, e.g. to empty it by moving the last list out).
-            if (content.unfiledLists.isNotEmpty() || entryIsUnfiled) {
-                pages.add(
-                    Folder(
-                        displayName = "",
-                        uri = rootUri,
-                        lists = content.unfiledLists,
-                        isUnfiled = true,
-                    ),
-                )
-            }
-            _uiState.value = FolderPagerUiState(isLoading = false, pages = pages)
+    /**
+     * Re-scans the vault and rebuilds the pages (same set, fresh URIs/names) — used after a
+     * folder rename inside the pager, which changes the folder's document URI. The page count
+     * and the unfiled inclusion stay frozen, so the badge does not jump.
+     */
+    fun rescanPages() {
+        viewModelScope.launch { scanPages() }
+    }
+
+    private suspend fun scanPages() {
+        val content = fileRepository.getVaultContent().getOrNull()
+        val rootUri = fileRepository.getFolderUri()
+        if (content == null || rootUri == null) {
+            _uiState.value = FolderPagerUiState(isLoading = false)
+            return
         }
+
+        // "Unfiled lists" is the rightmost page; only present when it holds lists (or when
+        // the user is currently inside it, e.g. to empty it by moving the last list out).
+        val include = includeUnfiled ?: (content.unfiledLists.isNotEmpty() || entryIsUnfiled)
+        includeUnfiled = include
+
+        val pages = content.folders.toMutableList()
+        if (include) {
+            pages.add(
+                Folder(
+                    displayName = "",
+                    uri = rootUri,
+                    lists = content.unfiledLists,
+                    isUnfiled = true,
+                ),
+            )
+        }
+        _uiState.value = FolderPagerUiState(isLoading = false, pages = pages)
     }
 
     private fun observeVaultChanges() {
@@ -416,6 +461,7 @@ fun FolderScreen(
             folderPosition = pageIndex + 1,
             folderCount = pages.size,
             vaultChanges = pagerViewModel.vaultChanges,
+            onRescanPages = { pagerViewModel.rescanPages() },
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -432,6 +478,7 @@ private fun FolderPage(
     folderPosition: Int,
     folderCount: Int,
     vaultChanges: SharedFlow<Unit>,
+    onRescanPages: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isUnfiled = folder.isUnfiled
@@ -456,6 +503,16 @@ private fun FolderPage(
         }
     }
 
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                FolderViewModel.Event.FolderRenamed -> onRescanPages()
+                FolderViewModel.Event.FolderDeleted -> onBack()
+                else -> Unit
+            }
+        }
+    }
+
     val resources = LocalResources.current
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
@@ -464,6 +521,7 @@ private fun FolderPage(
                 is FolderViewModel.Event.ShowMessage -> {
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
                 }
+                else -> Unit // FolderRenamed/FolderDeleted are handled in the collector above.
             }
         }
     }
@@ -477,6 +535,11 @@ private fun FolderPage(
     var renameValue by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<TodoList?>(null) }
     var moveListTarget by remember { mutableStateOf<TodoList?>(null) }
+
+    var showRenameFolderSheet by remember { mutableStateOf(false) }
+    var renameFolderValue by remember { mutableStateOf("") }
+    var showDeleteFolderDialog by remember { mutableStateOf(false) }
+    var folderMenuExpanded by remember(folder.uri) { mutableStateOf(false) }
 
     val newListSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val renameListSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -734,6 +797,102 @@ private fun FolderPage(
         }
     }
 
+    if (showRenameFolderSheet) {
+        val validation = remember(renameFolderValue) { validateFolderName(renameFolderValue) }
+        val errorText = validation.errorMessageResId?.let { stringResource(it) }
+        ModalBottomSheet(
+            onDismissRequest = {
+                showRenameFolderSheet = false
+                renameFolderValue = ""
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(bottom = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.home_rename_folder_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = renameFolderValue,
+                    onValueChange = { renameFolderValue = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(R.string.home_rename_folder_hint)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    isError = errorText != null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (errorText != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = errorText,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                showRenameFolderSheet = false
+                                renameFolderValue = ""
+                            }
+                        },
+                    ) {
+                        Text(text = stringResource(R.string.action_cancel))
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.renameFolder(renameFolderValue)
+                            scope.launch { showRenameFolderSheet = false; renameFolderValue = "" }
+                        },
+                        enabled = validation.normalizedName != null,
+                    ) {
+                        Text(text = stringResource(R.string.action_save))
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteFolderDialog = false },
+            title = { Text(text = stringResource(R.string.home_delete_folder_title)) },
+            text = {
+                Text(
+                    text = stringResource(R.string.home_delete_folder_body),
+                    textAlign = TextAlign.Start,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteFolder()
+                        showDeleteFolderDialog = false
+                    },
+                ) {
+                    Text(text = stringResource(R.string.home_delete_folder_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteFolderDialog = false }) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -761,8 +920,39 @@ private fun FolderPage(
                         text = stringResource(R.string.page_indicator, folderPosition, folderCount),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 16.dp),
+                        modifier = Modifier.padding(end = 8.dp),
                     )
+                    if (!isUnfiled) {
+                        Box {
+                            IconButton(onClick = { folderMenuExpanded = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.MoreVert,
+                                    contentDescription = stringResource(R.string.cd_overflow_menu),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = folderMenuExpanded,
+                                onDismissRequest = { folderMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.home_folder_action_rename)) },
+                                    onClick = {
+                                        folderMenuExpanded = false
+                                        renameFolderValue = uiState.folderName
+                                        showRenameFolderSheet = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.home_folder_action_delete)) },
+                                    onClick = {
+                                        folderMenuExpanded = false
+                                        showDeleteFolderDialog = true
+                                    },
+                                )
+                            }
+                        }
+                    }
                 },
             )
         },

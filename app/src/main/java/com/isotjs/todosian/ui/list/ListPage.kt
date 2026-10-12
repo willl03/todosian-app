@@ -25,10 +25,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -55,8 +59,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -68,6 +74,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
+import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.model.priorityRank
 import com.isotjs.todosian.data.settings.AppSettingsRepository
@@ -76,6 +83,7 @@ import com.isotjs.todosian.data.settings.TodoGrouping
 import com.isotjs.todosian.data.settings.TodoSort
 import com.isotjs.todosian.ui.components.TasksMetaEditor
 import com.isotjs.todosian.ui.components.TodoRow
+import com.isotjs.todosian.ui.components.validateListFileName
 import com.isotjs.todosian.ui.components.TodoSheetMode
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
@@ -87,6 +95,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.text.KeyboardOptions
 import java.time.LocalDate
 
 /**
@@ -107,12 +116,18 @@ fun ListPage(
     listPosition: Int = 1,
     /** Total lists in this list's folder (for the pager badge). */
     listCount: Int = 1,
+    /** Order-file key of the containing folder: the folder name, "" for unfiled. */
+    parentPath: String = "",
+    /** Document URI of the containing folder (vault root for unfiled); null when unknown. */
+    parentFolderUri: Uri? = null,
 ) {
     val viewModel: ListViewModel = viewModel(
         key = "list_$listUri",
         factory = ListViewModelFactory(
             fileRepository = fileRepository,
             listUri = listUri,
+            parentPath = parentPath,
+            parentFolderUri = parentFolderUri,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -145,6 +160,8 @@ fun ListPage(
     val scope = rememberCoroutineScope()
     val todoSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val moveSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val renameListSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val moveListSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var sheetMode by remember { mutableStateOf<TodoSheetMode?>(null) }
     var sheetText by remember { mutableStateOf("") }
@@ -154,6 +171,12 @@ fun ListPage(
     var deleteTodoHasSubtasks by remember { mutableStateOf(false) }
     var moveTodoTarget by remember { mutableStateOf<Todo?>(null) }
     var showCopyOption by remember { mutableStateOf(false) }
+
+    var listMenuExpanded by remember { mutableStateOf(false) }
+    var showRenameListSheet by remember { mutableStateOf(false) }
+    var renameListValue by remember { mutableStateOf("") }
+    var showDeleteListDialog by remember { mutableStateOf(false) }
+    var showMoveListSheet by remember { mutableStateOf(false) }
 
     var autoOpenedAddTodo by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -450,6 +473,188 @@ fun ListPage(
         }
     }
 
+    if (showRenameListSheet) {
+        val validation = remember(renameListValue) { validateListFileName(renameListValue) }
+        val errorText = validation.errorMessageResId?.let { stringResource(it) }
+        ModalBottomSheet(
+            onDismissRequest = {
+                showRenameListSheet = false
+                renameListValue = ""
+            },
+            sheetState = renameListSheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(bottom = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.folder_rename_list_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = renameListValue,
+                    onValueChange = { renameListValue = it },
+                    singleLine = true,
+                    label = { Text(text = stringResource(R.string.folder_rename_list_hint)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    isError = errorText != null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (errorText != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = errorText,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                renameListSheetState.hide()
+                                showRenameListSheet = false
+                                renameListValue = ""
+                            }
+                        },
+                    ) {
+                        Text(text = stringResource(R.string.action_cancel))
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.renameList(renameListValue)
+                            scope.launch {
+                                renameListSheetState.hide()
+                                showRenameListSheet = false
+                                renameListValue = ""
+                            }
+                        },
+                        enabled = validation.normalizedName != null,
+                    ) {
+                        Text(text = stringResource(R.string.action_save))
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteListDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteListDialog = false },
+            title = { Text(text = stringResource(R.string.folder_delete_list_title)) },
+            text = {
+                Text(
+                    text = stringResource(R.string.folder_delete_list_body),
+                    textAlign = TextAlign.Start,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteList()
+                        showDeleteListDialog = false
+                    },
+                ) {
+                    Text(text = stringResource(R.string.folder_delete_list_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteListDialog = false }) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showMoveListSheet) {
+        LaunchedEffect(Unit) {
+            viewModel.loadMoveFolderTargets()
+        }
+        ModalBottomSheet(
+            onDismissRequest = { showMoveListSheet = false },
+            sheetState = moveListSheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.folder_move_list_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.folder_move_list_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val targets = uiState.moveFolderTargets
+                when {
+                    targets == null -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            TodosianLoadingIndicator()
+                        }
+                    }
+
+                    targets.isEmpty() -> {
+                        Text(
+                            text = stringResource(R.string.folder_move_list_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    else -> {
+                        targets.forEach { target ->
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = if (target.isUnfiled) {
+                                            stringResource(R.string.home_unfiled_title)
+                                        } else {
+                                            target.displayName
+                                        },
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = if (target.isUnfiled) {
+                                            Icons.Outlined.Unarchive
+                                        } else {
+                                            Icons.Outlined.Folder
+                                        },
+                                        contentDescription = null,
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    viewModel.moveList(target)
+                                    showMoveListSheet = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -473,8 +678,44 @@ fun ListPage(
                         text = stringResource(R.string.page_indicator, listPosition, listCount),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 16.dp),
+                        modifier = Modifier.padding(end = 8.dp),
                     )
+                    Box {
+                        IconButton(onClick = { listMenuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.cd_overflow_menu),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = listMenuExpanded,
+                            onDismissRequest = { listMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.folder_list_action_rename)) },
+                                onClick = {
+                                    listMenuExpanded = false
+                                    renameListValue = uiState.title
+                                    showRenameListSheet = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.folder_list_action_move)) },
+                                onClick = {
+                                    listMenuExpanded = false
+                                    showMoveListSheet = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.folder_list_action_delete)) },
+                                onClick = {
+                                    listMenuExpanded = false
+                                    showDeleteListDialog = true
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -780,11 +1021,13 @@ private fun sortTodosByPriorityKeepingSubtasks(todos: List<Todo>): List<Todo> {
 class ListViewModelFactory(
     private val fileRepository: FileRepository,
     private val listUri: Uri,
+    private val parentPath: String = "",
+    private val parentFolderUri: Uri? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ListViewModel(fileRepository, listUri) as T
+            return ListViewModel(fileRepository, listUri, parentPath, parentFolderUri) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
