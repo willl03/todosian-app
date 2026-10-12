@@ -535,8 +535,6 @@ fun FolderScreen(
             folder = page,
             onOpenList = onOpenList,
             onBack = onBack,
-            folderPosition = pageIndex + 1,
-            folderCount = pages.size,
             vaultChanges = pagerViewModel.vaultChanges,
             onRescanPages = { pagerViewModel.rescanPages() },
             modifier = Modifier.fillMaxSize(),
@@ -552,8 +550,6 @@ private fun FolderPage(
     folder: Folder,
     onOpenList: (Uri) -> Unit,
     onBack: () -> Unit,
-    folderPosition: Int,
-    folderCount: Int,
     vaultChanges: SharedFlow<Unit>,
     onRescanPages: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1019,12 +1015,6 @@ private fun FolderPage(
                     }
                 },
                 actions = {
-                    Text(
-                        text = stringResource(R.string.page_indicator, folderPosition, folderCount),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
                     if (!isUnfiled) {
                         Box {
                             IconButton(onClick = { folderMenuExpanded = true }) {
