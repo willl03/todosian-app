@@ -205,9 +205,9 @@ fun SettingsScreen(
             options = listOf(
                 ChoiceOption(TodoSort.FILE_ORDER, stringResource(R.string.settings_todo_sort_file_order)),
                 ChoiceOption(TodoSort.PRIORITY_HIGH_TO_LOW, stringResource(R.string.settings_todo_sort_priority_desc)),
-                ChoiceOption(TodoSort.DUE_DATE_THEN_PRIORITY, stringResource(R.string.settings_todo_sort_due_priority)),
                 ChoiceOption(TodoSort.CREATED_DATE_NEWEST_FIRST, stringResource(R.string.settings_todo_sort_created_newest)),
                 ChoiceOption(TodoSort.DUE_DATE_EARLIEST_FIRST, stringResource(R.string.settings_todo_sort_due_earliest)),
+                ChoiceOption(TodoSort.DUE_DATE_THEN_PRIORITY, stringResource(R.string.settings_todo_sort_due_priority)),
             ),
             selected = settings.todoSort,
             onSelected = { appSettingsRepository.setTodoSort(it) },
