@@ -177,6 +177,8 @@ class CategoryViewModel(
             val result = fileRepository.deleteCategory(categoryUri)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
+            } else {
+                _events.emit(Event.CategoryDeleted)
             }
         }
     }
@@ -463,6 +465,8 @@ class CategoryViewModel(
 
     sealed interface Event {
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
+        /** The section was deleted; the UI should leave this screen (folder view takes over). */
+        data object CategoryDeleted : Event
     }
 
     private companion object {

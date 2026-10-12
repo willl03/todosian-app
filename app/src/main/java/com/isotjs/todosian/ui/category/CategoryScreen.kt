@@ -55,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,6 +121,8 @@ fun CategoryScreen(
     parentFolderUri: Uri? = null,
     /** Section name from the pager scan; seeds the title before the file is read. */
     seededTitle: String = "",
+    /** Called after this section is deleted from its own menu; the UI moves to the folder view. */
+    onCategoryDeleted: () -> Unit = {},
 ) {
     val viewModel: CategoryViewModel = viewModel(
         key = "list_$categoryUri",
@@ -148,12 +151,16 @@ fun CategoryScreen(
 
     val resources = LocalResources.current
     val snackbarHostState = remember { SnackbarHostState() }
+    // The deletion event arrives asynchronously; always call the latest callback so the
+    // pager's (possibly still-loading) folder URI is current when we leave the screen.
+    val currentOnCategoryDeleted by rememberUpdatedState(onCategoryDeleted)
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
                 is CategoryViewModel.Event.ShowMessage -> {
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
                 }
+                CategoryViewModel.Event.CategoryDeleted -> currentOnCategoryDeleted()
             }
         }
     }

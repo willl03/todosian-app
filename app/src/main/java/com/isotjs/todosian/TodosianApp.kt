@@ -235,6 +235,14 @@ fun TodosianApp(
                 onOpenFolderView = { folderUri ->
                     navController.navigate(Routes.folder(folderUri))
                 },
+                onCategoryDeleted = { folderUri, isUnfiled ->
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        KEY_REFRESH_HOME,
+                        System.currentTimeMillis(),
+                    )
+                    navController.popBackStack()
+                    navController.navigate(Routes.folder(folderUri, isUnfiled))
+                },
             )
         }
 

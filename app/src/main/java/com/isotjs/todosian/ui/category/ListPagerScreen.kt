@@ -110,6 +110,8 @@ fun ListPagerScreen(
     categoryUri: Uri,
     onBack: () -> Unit,
     onOpenFolderView: (Uri) -> Unit,
+    /** Called when the visible section deletes itself; the UI moves to the folder view. */
+    onCategoryDeleted: (folderUri: Uri, isUnfiled: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     autoOpenAddTodo: Boolean = false,
 ) {
@@ -281,6 +283,11 @@ fun ListPagerScreen(
                 parentPath = uiState.parentPath,
                 parentFolderUri = uiState.parentFolderUri,
                 seededTitle = page.displayName,
+                onCategoryDeleted = {
+                    uiState.parentFolderUri?.let { folderUri ->
+                        onCategoryDeleted(folderUri, uiState.parentPath.isBlank())
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
