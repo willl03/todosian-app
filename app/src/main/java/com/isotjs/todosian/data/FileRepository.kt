@@ -446,6 +446,9 @@ class SafFileRepository(
     }
 
     override suspend fun deleteFolder(folderUri: Uri): Result<Unit> {
+        // Capture the name before deletion: it is the folder's key in the manual order file,
+        // and a stale entry would let a recreated folder reclaim its old position.
+        val folderName = DocumentFile.fromTreeUri(appContext, folderUri)?.name
         return withContext(Dispatchers.IO) {
             runCatching {
                 val ok = DocumentsContract.deleteDocument(
@@ -461,6 +464,17 @@ class SafFileRepository(
             Log.w(TAG, "deleteDocument failed, falling back to recursive delete", error)
             deleteFolderRecursive(folderUri)
             scheduleWidgetUpdate()
+        }.onSuccess {
+            // Drop the folder (and its lists' order section) from the manual order file, so
+            // recreating a folder with the same name starts at the bottom again.
+            if (!folderName.isNullOrEmpty()) {
+                writeOrder { order ->
+                    order.copy(
+                        folders = order.folders - folderName,
+                        lists = order.lists - folderName,
+                    )
+                }
+            }
         }
     }
 
