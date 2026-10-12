@@ -288,6 +288,9 @@ fun ListPagerScreen(
                         onCategoryDeleted(folderUri, uiState.parentPath.isBlank())
                     }
                 },
+                onCategoryRenamed = { newName ->
+                    pagerViewModel.onCategoryRenamed(newName)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -567,6 +570,16 @@ class ListPagerViewModel(
             refresh()
             onCreated(created.getOrNull())
         }
+    }
+
+    /**
+     * Called when the visible section renames itself from its own menu: re-anchor onto the
+     * section by its new name (the rename invalidated its URI) and rescan immediately, so the
+     * pager re-keys the page onto the renamed document without waiting for the file observer.
+     */
+    fun onCategoryRenamed(newName: String) {
+        anchorName = newName
+        refresh()
     }
 
     /** Renames the folder; the scan re-anchors the visible section by name afterwards. */

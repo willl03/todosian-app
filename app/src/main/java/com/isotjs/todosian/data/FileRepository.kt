@@ -87,7 +87,7 @@ interface FileRepository {
     suspend fun createCategory(parentUri: Uri, name: String): Result<Uri>
 
     /** [parentPath]/[currentName] keep the manual order in sync (order-file entry renamed in place). */
-    suspend fun renameCategory(categoryUri: Uri, parentPath: String, currentName: String, newName: String): Result<Unit>
+    suspend fun renameCategory(categoryUri: Uri, parentPath: String, currentName: String, newName: String): Result<Uri>
 
     suspend fun deleteCategory(categoryUri: Uri): Result<Unit>
 
@@ -536,7 +536,7 @@ class SafFileRepository(
         parentPath: String,
         currentName: String,
         newName: String,
-    ): Result<Unit> {
+    ): Result<Uri> {
         val cleaned = newName.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
@@ -558,7 +558,11 @@ class SafFileRepository(
                 if (currentName.isNotBlank()) {
                     writeOrder { it.withRenamedList(parentPath, currentName, fileName.removeSuffix(".md")) }
                 }
+                // Keep widget bindings pointing at this list: the rename changes the document
+                // URI, exactly like a move does.
+                WidgetRefresher.remapSelection(appContext, oldUri = categoryUri, newUri = renamed)
                 scheduleWidgetUpdate()
+                renamed
             }
         }
     }

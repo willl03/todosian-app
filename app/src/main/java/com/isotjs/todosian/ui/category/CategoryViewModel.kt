@@ -43,7 +43,7 @@ data class MoveTarget(
 
 class CategoryViewModel(
     private val fileRepository: FileRepository,
-    private val categoryUri: Uri,
+    private var categoryUri: Uri,
     /** Order-file key of the containing folder: the folder name, "" for unfiled. */
     private val parentPath: String = "",
     /** Document URI of the containing folder (vault root for unfiled); the move source. */
@@ -169,9 +169,17 @@ class CategoryViewModel(
         viewModelScope.launch {
             val currentName = _uiState.value.title
             val result = fileRepository.renameCategory(categoryUri, parentPath, currentName, newName)
-            if (result.isFailure) {
+            val newUri = result.getOrNull()
+            if (result.isFailure || newUri == null) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
+                return@launch
             }
+            // A rename issues the document a new URI: adopt it so subsequent edits hit the
+            // renamed file, surface the new title right away, and let the pager re-anchor.
+            categoryUri = newUri
+            _uiState.value = _uiState.value.copy(title = newName)
+            refreshFromDisk(showLoading = false)
+            _events.emit(Event.CategoryRenamed(newName))
         }
     }
 
@@ -471,6 +479,8 @@ class CategoryViewModel(
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
         /** The section was deleted; the UI should leave this screen (folder view takes over). */
         data object CategoryDeleted : Event
+        /** The section renamed itself; the pager re-anchors onto it by its new name. */
+        data class CategoryRenamed(val newName: String) : Event
     }
 
     private companion object {

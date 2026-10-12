@@ -123,6 +123,8 @@ fun CategoryScreen(
     seededTitle: String = "",
     /** Called after this section is deleted from its own menu; the UI moves to the folder view. */
     onCategoryDeleted: () -> Unit = {},
+    /** Called after this section renames itself from its own menu; the pager re-anchors. */
+    onCategoryRenamed: (newName: String) -> Unit = {},
 ) {
     val viewModel: CategoryViewModel = viewModel(
         key = "list_$categoryUri",
@@ -151,9 +153,10 @@ fun CategoryScreen(
 
     val resources = LocalResources.current
     val snackbarHostState = remember { SnackbarHostState() }
-    // The deletion event arrives asynchronously; always call the latest callback so the
-    // pager's (possibly still-loading) folder URI is current when we leave the screen.
+    // The deletion/renaming events arrive asynchronously; always call the latest callback so
+    // the pager's (possibly still-loading) folder URI is current when we leave the screen.
     val currentOnCategoryDeleted by rememberUpdatedState(onCategoryDeleted)
+    val currentOnCategoryRenamed by rememberUpdatedState(onCategoryRenamed)
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
@@ -161,6 +164,7 @@ fun CategoryScreen(
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
                 }
                 CategoryViewModel.Event.CategoryDeleted -> currentOnCategoryDeleted()
+                is CategoryViewModel.Event.CategoryRenamed -> currentOnCategoryRenamed(event.newName)
             }
         }
     }
