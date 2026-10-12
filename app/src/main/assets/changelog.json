@@ -1,5 +1,46 @@
 [
   {
+    "versionCode": 10002,
+    "versionName": "2.2.0+fork.2",
+    "items": [
+      {
+        "icon": "Widgets",
+        "title": "Folder Widgets",
+        "description": "Widgets can now be bound to a whole folder: the header shows the folder name and its lists appear one after another with small headers, in your manual order."
+      },
+      {
+        "icon": "SubdirectoryArrowRight",
+        "title": "Context-Aware Add Button",
+        "description": "The widget's add button follows its binding - a folder widget opens the picker scoped to that folder's lists, and the full picker mirrors the folder structure."
+      },
+      {
+        "icon": "Palette",
+        "title": "Recolored, Centered Icon",
+        "description": "The launcher icon is now red on black, with the logo optically centered."
+      },
+      {
+        "icon": "Stars",
+        "title": "Todoist-Style Priorities",
+        "description": "Priorities are now P1 (red), P2 (yellow), P3 (blue) and P4 (default), consistent in light and dark themes."
+      },
+      {
+        "icon": "AutoAwesome",
+        "title": "Notes and a Cleaner Editor",
+        "description": "Each task can carry a one-line note, with links clickable from the list. The editor is decluttered: no start/scheduled/done fields (the completion date still shows on completed tasks) and no recurrence field."
+      },
+      {
+        "icon": "Swipe",
+        "title": "Long-Press Actions",
+        "description": "Move and Delete now live behind a long press on a todo - no more swipes fighting with list paging. Moving or copying shows the folder structure instead of a flat list."
+      },
+      {
+        "icon": "Checklist",
+        "title": "Smoother Deletion",
+        "description": "Deleting a list now takes you back to the folder view, whether or not other lists remain."
+      }
+    ]
+  },
+  {
     "versionCode": 10001,
     "versionName": "2.2.0+fork.1",
     "items": [
