@@ -388,18 +388,31 @@ class FolderPagerViewModel(
      * and the unfiled inclusion stay frozen, so the badge does not jump.
      */
     fun rescanPages() {
-        viewModelScope.launch { scanPages() }
+        scanPages()
     }
 
-    private suspend fun scanPages() {
-        val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
-        val rootUri = fileRepository.getFolderUri()
-        if (content == null || rootUri == null) {
-            _uiState.value = FolderPagerUiState(isLoading = false)
-            return
+    /**
+     * Rebuilds the pages from a fresh vault listing. Several scans can be in flight at once
+     * (rename-driven, the debounced file observer); a generation counter makes the
+     * last-STARTED scan the only one allowed to apply — a scan that read the listing before
+     * a rename must never apply stale pages (they would re-key a page onto a dead URI).
+     */
+    fun scanPages() {
+        val generation = ++scanGeneration
+        viewModelScope.launch {
+            val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
+            val rootUri = fileRepository.getFolderUri()
+            if (generation != scanGeneration) return@launch
+            if (content == null || rootUri == null) {
+                _uiState.value = FolderPagerUiState(isLoading = false)
+                return@launch
+            }
+            _uiState.value = buildPagerState(content, includeUnfiled = includeUnfiled)
         }
-        _uiState.value = buildPagerState(content, includeUnfiled = includeUnfiled)
     }
+
+    /** Guards `scanPages()`: only the most recently started scan may apply its result. */
+    private var scanGeneration = 0L
 
     /** Builds the full pager state from a vault layout, honoring the frozen unfiled inclusion. */
     private fun buildPagerState(content: VaultContent, includeUnfiled: Boolean?): FolderPagerUiState {

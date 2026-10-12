@@ -497,6 +497,9 @@ class ListPagerViewModel(
     private var pinnedFolderName: String? = null
     private var pinnedIsUnfiled = false
 
+    /** Guards `refresh()`: only the most recently started scan may apply its result. */
+    private var scanGeneration = 0L
+
     init {
         observeVaultChanges()
         // Instant first frame: the sending screen knows this folder's lists; the scan below
@@ -534,10 +537,17 @@ class ListPagerViewModel(
      * Re-scans the vault and rebuilds the pages from the fresh listing — the same logic as
      * the folder pager. The visible pager position never moves; pages re-key onto their
      * fresh URIs in place, so renames update the visible section without any anchoring.
+     * Several scans can be in flight at once (rename events, the debounced file observer);
+     * a generation counter makes the last-STARTED scan the only one allowed to apply — a
+     * scan that read the listing before a rename must never apply stale pages (they would
+     * re-key the visible page onto a dead URI: "could not read file" + the title rolling
+     * back).
      */
     fun refresh() {
+        val generation = ++scanGeneration
         viewModelScope.launch {
             val content = fileRepository.getVaultContent(includeCounts = false).getOrNull()
+            if (generation != scanGeneration) return@launch
             if (content == null) return@launch // keep the current state on a failed read
 
             val rootUri = fileRepository.getFolderUri()
