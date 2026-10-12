@@ -81,6 +81,7 @@
     <string name="folder_action_reorder">Reorder lists</string>
     <string name="folder_action_add_list">Add list</string>
     <string name="folder_reorder_hint">Hold and drag to reorder</string>
+    <string name="cd_toggle_completed">Show or hide completed tasks</string>
     <string name="widget_configure_folder_hint">Shows the tasks of every list in this folder</string>
     <string name="todo_row_action_move">Move</string>
     <string name="todo_row_action_delete">Delete</string>

@@ -26,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +66,7 @@ import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.VaultContent
+import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.FolderColorPickerSheet
@@ -125,6 +128,9 @@ fun ListPagerScreen(
         factory = ListPagerViewModelFactory(fileRepository, categoryUri),
     )
     val uiState by pagerViewModel.uiState.collectAsStateWithLifecycle()
+    val settings by appSettingsRepository.settings.collectAsStateWithLifecycle(
+        initialValue = com.isotjs.todosian.data.settings.AppSettings(),
+    )
     val resources = LocalResources.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -246,6 +252,21 @@ fun ListPagerScreen(
                     }
                 },
                 actions = {
+                    // The show-completed toggle: a global setting, independent of folders —
+                    // shown on unfiled lists too.
+                    IconButton(onClick = {
+                        appSettingsRepository.setShowCompleted(!settings.showCompleted)
+                    }) {
+                        Icon(
+                            imageVector = if (settings.showCompleted) {
+                                Icons.Outlined.Visibility
+                            } else {
+                                Icons.Outlined.VisibilityOff
+                            },
+                            contentDescription = stringResource(R.string.cd_toggle_completed),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     // Unfiled sections have no folder to act on.
                     if (uiState.folderName.isNotBlank()) {
                         Box {
