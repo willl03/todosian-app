@@ -1,46 +1,5 @@
 [
   {
-    "versionCode": 10002,
-    "versionName": "2.2.0+fork.2",
-    "items": [
-      {
-        "icon": "Widgets",
-        "title": "Folder Widgets",
-        "description": "Bind a widget to a whole folder: the header shows the folder name and its lists appear one after another with small headers, in your manual order."
-      },
-      {
-        "icon": "SubdirectoryArrowRight",
-        "title": "Smarter Add Flow",
-        "description": "The widget's add button now follows its binding - a folder widget opens the picker scoped to that folder's lists, and the full picker mirrors the folder structure."
-      },
-      {
-        "icon": "Palette",
-        "title": "A Fresh New Icon",
-        "description": "The launcher icon is recolored red on black, and the logo is now optically centered."
-      },
-      {
-        "icon": "Stars",
-        "title": "Todoist-Style Priorities",
-        "description": "Priorities are now P1 (red), P2 (orange), P3 (blue) and P4 (default), with a cleaner editor: start, scheduled, and completion date fields are gone."
-      },
-      {
-        "icon": "SwapVert",
-        "title": "Structured Move & Copy",
-        "description": "Moving or copying a todo shows the folder structure instead of a flat list."
-      },
-      {
-        "icon": "Swipe",
-        "title": "Long-Press Actions",
-        "description": "Move and Delete now live behind a long press on a todo - no more swipes fighting with list paging."
-      },
-      {
-        "icon": "Checklist",
-        "title": "Smoother Deletion",
-        "description": "Deleting a list now takes you back to the folder view, whether or not other lists remain."
-      }
-    ]
-  },
-  {
     "versionCode": 10001,
     "versionName": "2.2.0+fork.1",
     "items": [
