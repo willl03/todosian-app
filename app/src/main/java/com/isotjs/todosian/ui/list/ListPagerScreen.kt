@@ -34,6 +34,7 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.data.settings.AppSettingsRepository
+import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,7 +77,11 @@ fun ListPagerScreen(
     val uiState by pagerViewModel.uiState.collectAsStateWithLifecycle()
 
     val pages = uiState.pages
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    // Same as the folder pager: with a seed, land directly on the requested list.
+    val pagerState = rememberPagerState(
+        initialPage = pages.indexOfFirst { it.uri == listUri }.coerceAtLeast(0),
+        pageCount = { pages.size },
+    )
 
     // First time the pages arrive, land on the requested list.
     var landed by remember { mutableStateOf(false) }
@@ -156,7 +161,18 @@ class ListPagerViewModel(
 
     init {
         observeVaultChanges()
-        refresh()
+        // Instant first frame: the folder page knows this folder's lists; the scan below
+        // reconciles — the seed is a one-shot navigation argument.
+        val seed = NavSeed.consumeListPager(listUri)
+        if (seed != null) {
+            _uiState.value = ListPagerUiState(
+                isLoading = false,
+                pages = seed.lists,
+                parentPath = seed.parentPath,
+                parentFolderUri = seed.parentFolderUri,
+            )
+        }
+        viewModelScope.launch { refresh() }
     }
 
     private fun observeVaultChanges() {

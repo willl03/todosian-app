@@ -84,6 +84,8 @@ import com.isotjs.todosian.data.PreferencesManager
 import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.data.model.Folder
+import com.isotjs.todosian.data.model.VaultContent
+import com.isotjs.todosian.ui.NavSeed
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
 import com.isotjs.todosian.ui.components.DragReorderState

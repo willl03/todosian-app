@@ -83,12 +83,15 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.MoveFolderTarget
+import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.model.TodoList
 import com.isotjs.todosian.ui.components.DragReorderIndicatorSlot
 import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
+import com.isotjs.todosian.ui.NavSeed
+import com.isotjs.todosian.ui.ListPagerSeed
 import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.validateFolderName
 import com.isotjs.todosian.ui.components.validateListFileName
@@ -360,6 +363,12 @@ class FolderPagerViewModel(
 
     init {
         observeVaultChanges()
+        // Instant first frame: the sending screen (Home) knows the whole layout. The scan
+        // below still runs and reconciles — the seed is a one-shot navigation argument.
+        val seed = NavSeed.consumeVault(entryFolderUri, entryIsUnfiled)
+        if (seed != null) {
+            _uiState.value = buildPagerState(seed, includeUnfiled = null)
+        }
         viewModelScope.launch { scanPages() }
     }
 
@@ -379,24 +388,28 @@ class FolderPagerViewModel(
             _uiState.value = FolderPagerUiState(isLoading = false)
             return
         }
+        _uiState.value = buildPagerState(content, includeUnfiled = includeUnfiled)
+    }
 
+    /** Builds the full pager state from a vault layout, honoring the frozen unfiled inclusion. */
+    private fun buildPagerState(content: VaultContent, includeUnfiled: Boolean?): FolderPagerUiState {
         // "Unfiled lists" is the rightmost page; only present when it holds lists (or when
         // the user is currently inside it, e.g. to empty it by moving the last list out).
         val include = includeUnfiled ?: (content.unfiledLists.isNotEmpty() || entryIsUnfiled)
-        includeUnfiled = include
+        this.includeUnfiled = include
 
         val pages = content.folders.toMutableList()
         if (include) {
             pages.add(
                 Folder(
                     displayName = "",
-                    uri = rootUri,
+                    uri = fileRepository.getFolderUri() ?: Uri.EMPTY,
                     lists = content.unfiledLists,
                     isUnfiled = true,
                 ),
             )
         }
-        _uiState.value = FolderPagerUiState(isLoading = false, pages = pages)
+        return FolderPagerUiState(isLoading = false, pages = pages)
     }
 
     private fun observeVaultChanges() {
@@ -429,7 +442,13 @@ fun FolderScreen(
     val uiState by pagerViewModel.uiState.collectAsStateWithLifecycle()
 
     val pages = uiState.pages
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    // With a seed the pages exist at first composition — start directly on the entry page
+    // instead of landing there via a visible scroll. Without a seed (loader first) the
+    // `landed` effect below does the landing behind the loading gate.
+    val pagerState = rememberPagerState(
+        initialPage = pages.indexOfFirst { it.uri == folderUri }.coerceAtLeast(0),
+        pageCount = { pages.size },
+    )
 
     // First time the pages arrive, land on the requested folder.
     var landed by remember { mutableStateOf(false) }
@@ -1078,7 +1097,16 @@ private fun FolderPage(
                     DragReorderIndicatorSlot(dragState, rowKey)
                     TodoListRow(
                         list = list,
-                        onClick = { onOpenList(list.uri) },
+                        onClick = {
+                            NavSeed.seedListPager(
+                                ListPagerSeed(
+                                    parentPath = folder.displayName,
+                                    parentFolderUri = folder.uri,
+                                    lists = uiState.lists,
+                                ),
+                            )
+                            onOpenList(list.uri)
+                        },
                         countsPending = uiState.countsPending,
                         onRename = {
                             renameTarget = list
