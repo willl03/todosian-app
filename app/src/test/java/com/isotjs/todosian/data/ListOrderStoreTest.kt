@@ -34,6 +34,16 @@ class ListOrderStoreTest {
     }
 
     @Test
+    fun `trailing garbage from a non-truncating write parses to null`() {
+        // Corruption seen on a device: a shorter write left a stale tail of the previous JSON
+        // behind. The file must fail open instead of half-parsing.
+        val corrupted = """{"version":1,"folders":[],"lists":{"Alpha":["a","b"]}}}""" +
+            "\"]}}]}}lpha:[\"old1\",\"old2\"],\"Other\":[\"old3\"]}}ld3\"}}"
+
+        assertNull(ListOrder.parse(corrupted))
+    }
+
+    @Test
     fun `missing or wrong version parses to null`() {
         assertNull(ListOrder.parse("""{"folders":[]}"""))
         assertNull(ListOrder.parse("""{"version":2,"folders":[]}"""))
@@ -167,6 +177,62 @@ class ListOrderStoreTest {
         assertEquals(listOf("z", "y"), updated.lists.getValue("Work"))
         assertEquals(listOf("b"), updated.lists.getValue(ListOrder.UNFILED_KEY))
         assertEquals(listOf("Work"), updated.folders)
+    }
+
+    @Test
+    fun `withRenamedFolder keeps position and moves the lists section key`() {
+        val order = StoredOrder(
+            folders = listOf("Work", "Personal"),
+            lists = mapOf(
+                "Work" to listOf("Projects", "Meetings"),
+                ListOrder.UNFILED_KEY to listOf("Inbox"),
+            ),
+        )
+
+        val updated = order.withRenamedFolder("Work", "Deep Work")
+
+        // Folder keeps its position.
+        assertEquals(listOf("Deep Work", "Personal"), updated.folders)
+        // The lists section travels with the new key.
+        assertEquals(listOf("Projects", "Meetings"), updated.lists.getValue("Deep Work"))
+        assertNull(updated.lists["Work"])
+        assertEquals(listOf("Inbox"), updated.lists.getValue(ListOrder.UNFILED_KEY))
+    }
+
+    @Test
+    fun `withRenamedFolder for untracked folder is a no-op on content`() {
+        val order = StoredOrder(folders = listOf("A"), lists = mapOf("A" to listOf("x")))
+
+        val updated = order.withRenamedFolder("Z", "Y")
+
+        assertEquals(listOf("A"), updated.folders)
+        assertEquals(mapOf("A" to listOf("x")), updated.lists)
+    }
+
+    @Test
+    fun `withRenamedList renames in place only within its section`() {
+        val order = StoredOrder(
+            folders = listOf("Work", "Personal"),
+            lists = mapOf(
+                "Work" to listOf("a", "b", "c"),
+                "Personal" to listOf("a"),
+            ),
+        )
+
+        val updated = order.withRenamedList("Work", "b", "renamed")
+
+        assertEquals(listOf("a", "renamed", "c"), updated.lists.getValue("Work"))
+        assertEquals(listOf("a"), updated.lists.getValue("Personal"))
+    }
+
+    @Test
+    fun `withRenamedList for unordered section is a no-op`() {
+        val order = StoredOrder(folders = listOf("Work"))
+
+        val updated = order.withRenamedList("Work", "old", "new")
+
+        assertEquals(listOf("Work"), updated.folders)
+        assertEquals(emptyMap<String, List<String>>(), updated.lists)
     }
 
     // endregion

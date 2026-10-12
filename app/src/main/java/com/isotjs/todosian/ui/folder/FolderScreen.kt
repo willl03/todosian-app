@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Checklist
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
@@ -89,8 +87,10 @@ import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
 import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.todosianFabShape
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -132,21 +132,7 @@ class FolderViewModel(
     val events = _events.asSharedFlow()
 
     init {
-        observeVaultChanges()
         refresh()
-    }
-
-    private fun observeVaultChanges() {
-        @OptIn(FlowPreview::class)
-        viewModelScope.launch {
-            val rootUri = fileRepository.getFolderUri() ?: return@launch
-            fileRepository.observeMarkdownFilesChanges(rootUri)
-                .debounce(250)
-                .catch { /* TODO: Pull to refresh. */ }
-                .collectLatest {
-                    refresh(showLoading = false)
-                }
-        }
     }
 
     fun refresh(showLoading: Boolean = true) {
@@ -183,9 +169,9 @@ class FolderViewModel(
         }
     }
 
-    fun renameList(listUri: Uri, newName: String) {
+    fun renameList(listUri: Uri, currentName: String, newName: String) {
         viewModelScope.launch {
-            val result = fileRepository.renameList(listUri, newName)
+            val result = fileRepository.renameList(listUri, folderPath, currentName, newName)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch
@@ -284,14 +270,18 @@ data class FolderPagerUiState(
 )
 
 /**
- * Folder pager. [folderUri]/[isUnfiled] identify the folder to land on; swiping left/right moves
- * between sibling folders, "Unfiled lists" being the rightmost page.
+ * Folder pager. [entryFolderUri]/[entryIsUnfiled] identify the folder to land on; swiping
+ * left/right moves between sibling folders, "Unfiled lists" being the rightmost page.
  *
  * Pages are snapshotted once at entry and intentionally not re-scanned: nothing on this screen
  * can add or remove folders, so the pager badge (e.g. 2/5) stays stable for the whole visit.
  * Moving the last list out of "Unfiled lists" therefore keeps showing that page (as an empty
  * state) until the user backs out; the next entry picks up the new layout. The lists inside
  * each page stay live through the page's own [FolderViewModel].
+ *
+ * Observes the vault **once** for the whole pager (not per page): every vault change is
+ * re-broadcast on [vaultChanges] and each visible page refreshes itself from it. This keeps
+ * ContentObserver registrations and refresh work independent of how many pages were visited.
  */
 class FolderPagerViewModel(
     private val fileRepository: FileRepository,
@@ -302,7 +292,15 @@ class FolderPagerViewModel(
     private val _uiState = MutableStateFlow(FolderPagerUiState())
     val uiState: StateFlow<FolderPagerUiState> = _uiState.asStateFlow()
 
+    private val vaultChangesInternal = MutableSharedFlow<Unit>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val vaultChanges: SharedFlow<Unit> = vaultChangesInternal.asSharedFlow()
+
     init {
+        observeVaultChanges()
         viewModelScope.launch {
             val content = fileRepository.getVaultContent().getOrNull()
             val rootUri = fileRepository.getFolderUri()
@@ -325,6 +323,19 @@ class FolderPagerViewModel(
                 )
             }
             _uiState.value = FolderPagerUiState(isLoading = false, pages = pages)
+        }
+    }
+
+    private fun observeVaultChanges() {
+        @OptIn(FlowPreview::class)
+        viewModelScope.launch {
+            val rootUri = fileRepository.getFolderUri() ?: return@launch
+            fileRepository.observeMarkdownFilesChanges(rootUri)
+                .debounce(250)
+                .catch { /* best-effort */ }
+                .collectLatest {
+                    vaultChangesInternal.tryEmit(Unit)
+                }
         }
     }
 }
@@ -407,6 +418,7 @@ fun FolderScreen(
             onBack = onBack,
             folderPosition = pageIndex + 1,
             folderCount = pages.size,
+            vaultChanges = pagerViewModel.vaultChanges,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -422,6 +434,7 @@ private fun FolderPage(
     onBack: () -> Unit,
     folderPosition: Int,
     folderCount: Int,
+    vaultChanges: SharedFlow<Unit>,
     modifier: Modifier = Modifier,
 ) {
     val isUnfiled = folder.isUnfiled
@@ -434,6 +447,14 @@ private fun FolderPage(
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, viewModel) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.refresh(showLoading = false)
+        }
+    }
+
+    // Vault changes (sync, Obsidian edits) refresh this page; the single ContentObserver
+    // registration lives in the pager's ViewModel.
+    LaunchedEffect(viewModel, vaultChanges) {
+        vaultChanges.collect {
             viewModel.refresh(showLoading = false)
         }
     }
@@ -586,7 +607,7 @@ private fun FolderPage(
                             val target = renameTarget
                             val normalized = validation.normalizedFileName
                             if (target != null && normalized != null) {
-                                viewModel.renameList(target.uri, normalized)
+                                viewModel.renameList(target.uri, currentName = target.displayName, newName = normalized)
                             }
                             scope.launch {
                                 renameListSheetState.hide()

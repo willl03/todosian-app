@@ -59,13 +59,15 @@ interface FileRepository {
 
     suspend fun createFolder(name: String): Result<Uri>
 
-    suspend fun renameFolder(folderUri: Uri, newName: String): Result<Unit>
+    /** [currentName] keeps the manual order in sync (renaming the order-file entry in place). */
+    suspend fun renameFolder(folderUri: Uri, currentName: String, newName: String): Result<Unit>
 
     suspend fun deleteFolder(folderUri: Uri): Result<Unit>
 
     suspend fun createList(parentUri: Uri, name: String): Result<Uri>
 
-    suspend fun renameList(listUri: Uri, newName: String): Result<Unit>
+    /** [parentPath]/[currentName] keep the manual order in sync (order-file entry renamed in place). */
+    suspend fun renameList(listUri: Uri, parentPath: String, currentName: String, newName: String): Result<Unit>
 
     suspend fun deleteList(listUri: Uri): Result<Unit>
 
@@ -362,7 +364,7 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun renameFolder(folderUri: Uri, newName: String): Result<Unit> {
+    override suspend fun renameFolder(folderUri: Uri, currentName: String, newName: String): Result<Unit> {
         val cleaned = newName.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
@@ -374,6 +376,15 @@ class SafFileRepository(
                     cleaned,
                 )
                 if (renamed == null) throw IllegalStateException("Unable to rename folder")
+
+                // Keep the manual order: rename the folder's entry and its lists-section key in
+                // place. Best-effort — if the order write fails, the folder falls back to the
+                // end of the list (A–Z), which is the pre-ordering behavior anyway.
+                if (currentName.isNotBlank()) {
+                    getFolderUri()?.let { rootUri ->
+                        orderStore.write(rootUri) { it.withRenamedFolder(currentName, cleaned) }
+                    }
+                }
                 scheduleWidgetUpdate()
             }
         }
@@ -389,7 +400,30 @@ class SafFileRepository(
                 if (!ok) throw IllegalStateException("Unable to delete folder")
                 scheduleWidgetUpdate()
             }
+        }.recoverCatching { error ->
+            // Some SAF providers (SD cards, some cloud mounts) refuse to delete non-empty
+            // directories. Delete the children one by one, then the directory itself.
+            Log.w(TAG, "deleteDocument failed, falling back to recursive delete", error)
+            deleteFolderRecursive(folderUri)
+            scheduleWidgetUpdate()
         }
+    }
+
+    private suspend fun deleteFolderRecursive(folderUri: Uri) {
+        val folder = DocumentFile.fromTreeUri(appContext, folderUri)
+            ?: throw IllegalStateException("Invalid folder URI")
+        for (child in folder.listFiles()) {
+            if (child.isDirectory) {
+                deleteFolderRecursive(child.uri)
+            } else if (!child.delete()) {
+                throw IllegalStateException("Unable to delete file inside folder")
+            }
+        }
+        val ok = DocumentsContract.deleteDocument(
+            appContext.contentResolver,
+            parentDocumentUri(folderUri),
+        )
+        if (!ok) throw IllegalStateException("Unable to delete folder")
     }
 
     override suspend fun createList(parentUri: Uri, name: String): Result<Uri> {
@@ -411,7 +445,12 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun renameList(listUri: Uri, newName: String): Result<Unit> {
+    override suspend fun renameList(
+        listUri: Uri,
+        parentPath: String,
+        currentName: String,
+        newName: String,
+    ): Result<Unit> {
         val cleaned = newName.trim()
         if (cleaned.isEmpty()) return Result.failure(IllegalArgumentException("Empty name"))
 
@@ -427,6 +466,16 @@ class SafFileRepository(
 
                 val renamed = DocumentsContract.renameDocument(appContext.contentResolver, listUri, fileName)
                 if (renamed == null) throw IllegalStateException("Unable to rename document")
+
+                // Keep the manual order: rename the list's entry in its folder's section, in
+                // place. Best-effort, same trade-off as folder renames.
+                if (currentName.isNotBlank()) {
+                    getFolderUri()?.let { rootUri ->
+                        orderStore.write(rootUri) {
+                            it.withRenamedList(parentPath, currentName, fileName.removeSuffix(".md"))
+                        }
+                    }
+                }
                 scheduleWidgetUpdate()
             }
         }
@@ -529,11 +578,13 @@ class SafFileRepository(
     override suspend fun reorderFolders(orderedFolderPaths: List<String>): Result<Unit> {
         val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
         return orderStore.write(folderUri) { it.withFolderOrder(orderedFolderPaths) }
+            .onSuccess { scheduleWidgetUpdate() }
     }
 
     override suspend fun reorderLists(parentPath: String, orderedListNames: List<String>): Result<Unit> {
         val folderUri = getFolderUri() ?: return Result.failure(IllegalStateException("No folder selected"))
         return orderStore.write(folderUri) { it.withListOrder(parentPath, orderedListNames) }
+            .onSuccess { scheduleWidgetUpdate() }
     }
 
     override fun hasPersistedReadWritePermission(uri: Uri): Boolean {

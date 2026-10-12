@@ -90,7 +90,11 @@ class HomeViewModel(
 
     fun renameFolder(folderUri: Uri, newName: String) {
         viewModelScope.launch {
-            val result = fileRepository.renameFolder(folderUri, newName)
+            val currentName = _uiState.value.folders
+                .firstOrNull { it.uri == folderUri }
+                ?.displayName
+                .orEmpty()
+            val result = fileRepository.renameFolder(folderUri, currentName, newName)
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 return@launch

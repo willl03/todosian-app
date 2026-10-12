@@ -124,6 +124,31 @@ data class StoredOrder(
     /** Copy with a replaced lists section for [parentPath]; other sections preserved. */
     fun withListOrder(parentPath: String, orderedLists: List<String>): StoredOrder =
         copy(lists = lists + (parentPath to orderedLists))
+
+    /**
+     * Renames a folder entry **in place** so an in-app rename keeps both the folder's position
+     * and its lists' stored order (the lists section key is renamed with it). Absent entries
+     * are a no-op.
+     */
+    fun withRenamedFolder(oldPath: String, newPath: String): StoredOrder {
+        if (oldPath == newPath) return this
+        val renamedFolders = folders.map { if (it == oldPath) newPath else it }
+        val renamedLists = LinkedHashMap<String, List<String>>(lists.size)
+        lists.forEach { (parent, names) ->
+            renamedLists[if (parent == oldPath) newPath else parent] = names
+        }
+        return copy(folders = renamedFolders, lists = renamedLists)
+    }
+
+    /**
+     * Renames a list entry within its parent section, in place. Absent sections/entries are a
+     * no-op (the list was never manually ordered and will still fall back to A–Z).
+     */
+    fun withRenamedList(parentPath: String, oldName: String, newName: String): StoredOrder {
+        if (oldName == newName) return this
+        val section = lists[parentPath] ?: return this
+        return copy(lists = lists + (parentPath to section.map { if (it == oldName) newName else it }))
+    }
 }
 
 /**
@@ -188,6 +213,10 @@ class ListOrderStore(private val appContext: Context) {
 
     private fun writeTextInternal(uri: Uri, text: String) {
         appContext.contentResolver.openOutputStream(uri, "w")?.use { out ->
+            // SAF's "w" mode does not reliably truncate: if the new content is shorter than
+            // the old, a stale tail of the previous JSON would remain and corrupt the file
+            // (read back would fail). Mirror the todo-file writer and truncate explicitly.
+            runCatching { (out as? java.io.FileOutputStream)?.channel?.truncate(0) }
             out.bufferedWriter().use { writer ->
                 writer.write(text)
             }
