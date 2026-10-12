@@ -32,7 +32,11 @@
 </p>
 
 > **Note:** builds are signed with a personal key — install over any previous build of
-> this fork (not over upstream's F-Droid/Play builds). Everything below is the upstream readme.
+> this fork (not over upstream's F-Droid/Play builds).
+
+*Everything below this notice is the upstream readme.*
+
+<h2 align="center">Description</h2>
 
 Todosian is an Android app for managing todo lists stored as Markdown files inside your Obsidian vault.
 
