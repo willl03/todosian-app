@@ -250,7 +250,7 @@ fun ListPagerScreen(
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.padding(end = 12.dp),
                     )
                     // The show-completed toggle: a global setting, independent of folders —
                     // shown on unfiled lists too.
