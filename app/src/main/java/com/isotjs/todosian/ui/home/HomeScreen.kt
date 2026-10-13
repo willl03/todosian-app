@@ -29,11 +29,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -783,6 +788,7 @@ private fun FolderRow(
                     ) {
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.home_folder_action_rename)) },
+                            leadingIcon = { Icon(imageVector = Icons.Outlined.Edit, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
                                 onRename()
@@ -791,6 +797,7 @@ private fun FolderRow(
                         if (onPickColor != null) {
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(R.string.home_folder_action_color)) },
+                                leadingIcon = { Icon(imageVector = Icons.Outlined.Palette, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
                                     onPickColor()
@@ -800,6 +807,7 @@ private fun FolderRow(
                         if (onMoveUp != null) {
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(R.string.home_folder_action_move_up)) },
+                                leadingIcon = { Icon(imageVector = Icons.Filled.KeyboardArrowUp, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
                                     onMoveUp()
@@ -809,6 +817,7 @@ private fun FolderRow(
                         if (onMoveDown != null) {
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(R.string.home_folder_action_move_down)) },
+                                leadingIcon = { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) },
                                 onClick = {
                                     menuExpanded = false
                                     onMoveDown()
@@ -817,6 +826,7 @@ private fun FolderRow(
                         }
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.home_folder_action_delete)) },
+                            leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
                                 onDelete()
