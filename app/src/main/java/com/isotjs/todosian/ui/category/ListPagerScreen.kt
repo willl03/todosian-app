@@ -324,7 +324,7 @@ fun ListPagerScreen(
                         onCategoryDeleted(folderUri, uiState.parentPath.isBlank())
                     }
                 },
-                onCategoryRenamed = { pagerViewModel.refresh() },
+                onCategoryRenamed = { newName -> pagerViewModel.onCategoryRenamed(newName) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -518,6 +518,13 @@ class ListPagerViewModel(
     private var pinnedFolderName: String? = null
     private var pinnedIsUnfiled = false
 
+    /**
+     * The display name of the section this pager was opened for. A FOLDER rename changes the
+     * folder's URI and name but never its sections' names, so this is the stable identifier
+     * used to re-resolve the folder when both folder pins go stale.
+     */
+    private var entryListName: String? = null
+
     /** Guards `refresh()`: only the most recently started scan may apply its result. */
     private var scanGeneration = 0L
 
@@ -530,6 +537,9 @@ class ListPagerViewModel(
             pinnedFolderUri = seed.parentFolderUri
             pinnedFolderName = seed.parentPath
             pinnedIsUnfiled = seed.parentPath.isBlank()
+            entryListName = seed.lists
+                .firstOrNull { it.uri == categoryUri }
+                ?.displayName
             _uiState.value = ListPagerUiState(
                 isLoading = false,
                 pages = seed.lists,
@@ -579,6 +589,12 @@ class ListPagerViewModel(
                         ?: content.folders.firstOrNull {
                             pinnedFolderName != null && it.displayName == pinnedFolderName
                         }
+                        // Last resort after a FOLDER rename: the folder containing the entry
+                        // section, whose name a folder rename never touches.
+                        ?: content.folders.firstOrNull { folder ->
+                            entryListName != null &&
+                                folder.lists.any { it.displayName == entryListName }
+                        }
                 // First scan (widget deep link): find the folder holding the entry section.
                 else -> content.folders.firstOrNull { folder ->
                     folder.lists.any { it.uri == categoryUri }
@@ -591,6 +607,12 @@ class ListPagerViewModel(
                 folder != null -> folder.lists
                 unfiled -> content.unfiledLists
                 else -> emptyList()
+            }
+
+            if (entryListName == null && folder != null) {
+                entryListName = folder.lists
+                    .firstOrNull { it.uri == categoryUri }
+                    ?.displayName
             }
 
             // Pin (or re-pin) the folder.
@@ -648,7 +670,8 @@ class ListPagerViewModel(
      * listing, and the visible page re-keys onto the renamed document at the same position
      * (the folder pager's rename logic, verbatim).
      */
-    fun onCategoryRenamed() {
+    fun onCategoryRenamed(newName: String) {
+        entryListName = newName
         refresh()
     }
 
@@ -661,6 +684,10 @@ class ListPagerViewModel(
             if (result.isFailure) {
                 _events.emit(Event.ShowMessage(R.string.error_write_failed))
             } else {
+                // A folder rename changes the folder's URI and name: re-pin by the new name
+                // so the scan re-resolves the folder (and its freshly-renamed children).
+                pinnedFolderName = newName
+                pinnedIsUnfiled = false
                 refresh()
             }
         }
