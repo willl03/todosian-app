@@ -31,9 +31,7 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -133,18 +131,12 @@ fun TodoRow(
                     animationSpec = tween(300),
                     label = "todo-text-color",
                 )
-                val priorityColor = priorityColorFor(todo.priority)
+                // The priority is shown in the footer's chip (a colored dot + P1–P4);
+                // no dot next to the name anymore.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (priorityColor != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(color = priorityColor, shape = CircleShape),
-                        )
-                    }
                     Text(
                         text = todo.text,
                         style = MaterialTheme.typography.bodyLarge,
@@ -177,23 +169,18 @@ fun TodoRow(
                                 .horizontalScroll(rememberScrollState()),
                         ) {
                             chips.forEach { chip ->
-                                val chipColors = chip.color?.let { color ->
-                                    AssistChipDefaults.assistChipColors(
-                                        containerColor = color,
-                                        labelColor = MaterialTheme.colorScheme.onSurface,
-                                        leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                }
                                 androidx.compose.material3.AssistChip(
                                     onClick = {},
                                     enabled = false,
-                                    colors = chipColors ?: AssistChipDefaults.assistChipColors(),
                                     leadingIcon = chip.icon?.let { icon ->
                                         {
                                             Icon(
                                                 imageVector = icon,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(18.dp),
+                                                // The priority chip's dot carries the
+                                                // priority color; other icons stay muted.
+                                                tint = chip.color ?: LocalContentColor.current,
                                             )
                                         }
                                     },
@@ -588,7 +575,7 @@ internal fun buildTasksMetaChips(
         chips.add(
             TasksMetaChipUi(
                 label = label,
-                icon = if (useEmojisInUi) null else Icons.Outlined.Star,
+                icon = Icons.Filled.Circle,
                 color = priorityColorFor(prio),
             ),
         )
