@@ -1,5 +1,31 @@
 [
   {
+    "versionCode": 10004,
+    "versionName": "2.2.0+fork.4",
+    "items": [
+      {
+        "icon": "SubdirectoryArrowRight",
+        "title": "Folder Renames From Anywhere",
+        "description": "Renaming a folder from the list view's top bar now works while its lists are open - no more \"List unavailable\" - and returning from the folder view after a rename lands you right back where you were."
+      },
+      {
+        "icon": "Checklist",
+        "title": "Home Menu Icons",
+        "description": "The folder card menu on the Home screen now carries the same icons as the folder and section menus."
+      },
+      {
+        "icon": "Stars",
+        "title": "The Priority Dot Moved",
+        "description": "The colored priority dot now lives inside the P-chip in the task's footer - [(dot) P1] - instead of beside the task name."
+      },
+      {
+        "icon": "FilterCenterFocus",
+        "title": "Indicator Placement",
+        "description": "The section position indicator moved next to the show/hide toggle in the folder bar, with balanced spacing."
+      }
+    ]
+  },
+  {
     "versionCode": 10003,
     "versionName": "2.2.0+fork.3",
     "items": [

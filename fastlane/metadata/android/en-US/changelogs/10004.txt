@@ -1,0 +1,7 @@
+Fourth fork release, based on upstream 2.2.
+
+Improvements:
+• Renaming a folder from the list view's top bar now works while its lists are open - no more "List unavailable" - and returning from the folder view after a rename lands you back where you were
+• The colored priority dot moved into the P-chip in the task footer: [(dot) P1] instead of a dot beside the task name
+• The section position indicator moved next to the show/hide toggle in the folder bar, with balanced spacing
+• The folder card menu on the Home screen now carries icons, matching the folder and section menus
