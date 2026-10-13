@@ -226,22 +226,11 @@ fun ListPagerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = folderTitle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = stringResource(
-                                R.string.page_indicator,
-                                pagerState.currentPage + 1,
-                                pages.size,
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = folderTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -252,6 +241,17 @@ fun ListPagerScreen(
                     }
                 },
                 actions = {
+                    // The visible section's position within the folder.
+                    Text(
+                        text = stringResource(
+                            R.string.page_indicator,
+                            pagerState.currentPage + 1,
+                            pages.size,
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
                     // The show-completed toggle: a global setting, independent of folders —
                     // shown on unfiled lists too.
                     IconButton(onClick = {
