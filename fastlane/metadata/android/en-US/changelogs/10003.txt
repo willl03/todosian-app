@@ -1,0 +1,10 @@
+Third fork release, based on upstream 2.2.
+
+Improvements:
+• Renaming a list updates it in place, works across successive renames, and no longer breaks widget bindings
+• Show/hide completed tasks: a dedicated eye toggle in every list's top bar; the menu entry and the Settings switch are gone
+• The keyboard's check button saves the add/edit sheet from every field
+• The due-date field is now labeled "Date"
+• Folder and section menus carry matching icons
+• Folder view: no swiping between folders, no position badge, and a list created in an empty folder opens right away
+• Stale scan protection: no more "could not read file" errors on rapid successive renames

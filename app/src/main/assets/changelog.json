@@ -1,5 +1,36 @@
 [
   {
+    "versionCode": 10003,
+    "versionName": "2.2.0+fork.3",
+    "items": [
+      {
+        "icon": "AutoAwesome",
+        "title": "Reliable Renaming",
+        "description": "Rename a list as many times in a row as you like: the pager updates in place, no error popups, and home-screen widgets keep working across renames."
+      },
+      {
+        "icon": "Checklist",
+        "title": "Show/Hide at a Glance",
+        "description": "A dedicated eye toggle in every list's top bar replaces the menu entry - and the Settings switch, which is gone now."
+      },
+      {
+        "icon": "Stars",
+        "title": "Smoother Editor",
+        "description": "The keyboard's check button saves the sheet from every field, and the due-date field is simply labeled Date."
+      },
+      {
+        "icon": "SubdirectoryArrowRight",
+        "title": "Focused Folder View",
+        "description": "No more swiping between folders in the folder view: the position badge is gone, and a list created in an empty folder opens right away."
+      },
+      {
+        "icon": "Checklist",
+        "title": "Menu Icons Everywhere",
+        "description": "Folder and section menus now carry matching icons for rename, move, delete, and more."
+      }
+    ]
+  },
+  {
     "versionCode": 10002,
     "versionName": "2.2.0+fork.2",
     "items": [
