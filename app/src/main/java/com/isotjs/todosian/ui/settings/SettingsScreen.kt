@@ -116,7 +116,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(fileRepository),
+        factory = SettingsViewModelFactory(fileRepository, appSettingsRepository),
     )
 
     var showChangelogSheet by remember { mutableStateOf(false) }
@@ -210,7 +210,7 @@ fun SettingsScreen(
                 ChoiceOption(TodoSort.DUE_DATE_THEN_PRIORITY, stringResource(R.string.settings_todo_sort_due_priority)),
             ),
             selected = settings.todoSort,
-            onSelected = { appSettingsRepository.setTodoSort(it) },
+            onSelected = { viewModel.setTodoSort(it) },
             onDismiss = { showTodoSortDialog = false },
         )
     }
@@ -822,11 +822,12 @@ private fun dailyFocusModeLabel(mode: DailyFocusMode): String {
 
 private class SettingsViewModelFactory(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(fileRepository) as T
+            return SettingsViewModel(fileRepository, appSettingsRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

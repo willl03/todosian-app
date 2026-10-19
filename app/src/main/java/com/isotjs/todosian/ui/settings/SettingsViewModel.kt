@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
+import com.isotjs.todosian.data.settings.AppSettingsRepository
+import com.isotjs.todosian.data.settings.TodoSort
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ data class StorageUiState(
 
 class SettingsViewModel(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private val _storageState = MutableStateFlow(StorageUiState(isChecking = true))
     val storageState: StateFlow<StorageUiState> = _storageState.asStateFlow()
@@ -32,6 +35,15 @@ class SettingsViewModel(
 
     init {
         refreshStorageStatus()
+    }
+
+    /**
+     * Persists the todo sort order and refreshes the widgets: widget content is rebuilt from the
+     * files only on writes, so a settings-only change needs an explicit refresh to re-sort.
+     */
+    fun setTodoSort(sort: TodoSort) {
+        appSettingsRepository.setTodoSort(sort)
+        fileRepository.scheduleWidgetRefresh()
     }
 
     fun refreshStorageStatus() {

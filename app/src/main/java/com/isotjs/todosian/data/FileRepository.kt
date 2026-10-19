@@ -47,6 +47,12 @@ internal fun isDocumentWithinFolder(
 interface FileRepository {
     fun getFolderUri(): Uri?
 
+    /**
+     * Schedules a debounced widget refresh for settings changes that affect widget content
+     * (e.g. the todo sort order) but do not touch any file, so no write-triggered refresh runs.
+     */
+    fun scheduleWidgetRefresh()
+
     fun isCategoryUri(uri: Uri): Boolean
 
     fun clearFolderUri()
@@ -145,6 +151,8 @@ class SafFileRepository(
             refreshTodosianWidget()
         }
     }
+
+    override fun scheduleWidgetRefresh() = scheduleWidgetUpdate()
 
 
     private fun refreshTodosianWidget() {

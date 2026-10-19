@@ -25,7 +25,9 @@ import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.data.model.TasksPriority
 import com.isotjs.todosian.data.settings.AppSettings
+import com.isotjs.todosian.data.settings.TodoSort
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TodoSorter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -73,6 +75,36 @@ internal fun filterCompletedItems(
     items: List<WidgetTaskItem>,
     showCompleted: Boolean,
 ): List<WidgetTaskItem> = if (showCompleted) items else items.filter { !it.todo.isDone }
+
+/**
+ * Applies the app's todo sort setting per list, keeping list blocks intact: tasks are ordered
+ * within each list, but lists themselves stay in vault order. This mirrors the list screen,
+ * where every list sorts its own todos, and preserves the section structure folder-bound
+ * widgets render. Sorting happens before the active/completed split; [TodoSorter] is stable
+ * on file order, so the relative order within each split is preserved.
+ */
+internal fun sortTaskItemsPerList(
+    items: List<WidgetTaskItem>,
+    sort: TodoSort,
+): List<WidgetTaskItem> {
+    if (sort == TodoSort.FILE_ORDER || items.isEmpty()) return items
+
+    val result = ArrayList<WidgetTaskItem>(items.size)
+    var blockStart = 0
+    while (blockStart < items.size) {
+        val blockUri = items[blockStart].categoryUri
+        var blockEnd = blockStart
+        while (blockEnd < items.size && items[blockEnd].categoryUri == blockUri) blockEnd++
+
+        val block = items.subList(blockStart, blockEnd)
+        val sortedTodos = TodoSorter.sort(block.map { it.todo }, sort)
+        val byLineIndex = block.associateBy { it.todo.lineIndex }
+        result.addAll(sortedTodos.mapNotNull { byLineIndex[it.lineIndex] })
+
+        blockStart = blockEnd
+    }
+    return result
+}
 
 /**
  * What a widget instance is bound to: a single list ([categoryUri]), a whole folder
@@ -364,6 +396,7 @@ object WidgetRefresher {
                     selection = selections[index],
                     showCompleted = showCompletedFlags[index],
                     priorityLabels = priorityLabels,
+                    todoSort = settings.todoSort,
                 )
                 runCatching {
                     updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
@@ -431,6 +464,7 @@ object WidgetRefresher {
         selection: WidgetSelection,
         showCompleted: Boolean,
         priorityLabels: Map<TasksPriority, String>,
+        todoSort: TodoSort,
     ): WidgetSnapshot {
         val categories = content.allLists()
 
@@ -461,6 +495,7 @@ object WidgetRefresher {
                 showCompleted = showCompleted,
                 priorityLabels = priorityLabels,
                 selectedFolderUri = resolvedFolder.uri.toString(),
+                todoSort = todoSort,
             )
         }
 
@@ -491,6 +526,7 @@ object WidgetRefresher {
             showCompleted = showCompleted,
             priorityLabels = priorityLabels,
             selectedFolderUri = null,
+            todoSort = todoSort,
         )
     }
 
@@ -509,18 +545,22 @@ object WidgetRefresher {
         showCompleted: Boolean,
         priorityLabels: Map<TasksPriority, String>,
         selectedFolderUri: String? = null,
+        todoSort: TodoSort = TodoSort.FILE_ORDER,
     ): WidgetSnapshot {
-        val taskItems = scopedCategories.flatMap { category ->
-            val lines = linesByUri[category.uri].orEmpty()
-            MarkdownParser.parse(lines).map { todo ->
-                WidgetTaskItem(
-                    categoryUri = category.uri.toString(),
-                    listName = category.displayName,
-                    todo = todo,
-                    priorityLabel = priorityLabels[todo.priority],
-                )
-            }
-        }
+        val taskItems = sortTaskItemsPerList(
+            items = scopedCategories.flatMap { category ->
+                val lines = linesByUri[category.uri].orEmpty()
+                MarkdownParser.parse(lines).map { todo ->
+                    WidgetTaskItem(
+                        categoryUri = category.uri.toString(),
+                        listName = category.displayName,
+                        todo = todo,
+                        priorityLabel = priorityLabels[todo.priority],
+                    )
+                }
+            },
+            sort = todoSort,
+        )
         val activeTasks = taskItems.filter { !it.todo.isDone }
         val completedTasks = taskItems.filter { it.todo.isDone }
         val visible = filterCompletedItems(activeTasks + completedTasks, showCompleted)
