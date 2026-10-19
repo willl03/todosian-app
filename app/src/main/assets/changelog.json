@@ -1,5 +1,21 @@
 [
   {
+    "versionCode": 10005,
+    "versionName": "2.2.0+fork.5",
+    "items": [
+      {
+        "icon": "Widgets",
+        "title": "Widgets Follow Your Sort",
+        "description": "The home-screen widget now respects the todo sort order from Settings. Changing the order re-sorts the widget right away - no need to wait for the next edit."
+      },
+      {
+        "icon": "SwapVert",
+        "title": "Sorted Per List",
+        "description": "In folder and all-lists widgets, each list keeps its tasks together, so section headers stay in place while tasks sort within their own list."
+      }
+    ]
+  },
+  {
     "versionCode": 10004,
     "versionName": "2.2.0+fork.4",
     "items": [

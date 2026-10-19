@@ -1,0 +1,5 @@
+Fifth fork release, based on upstream 2.2.
+
+Fixes:
+• Widgets now follow the todo sort setting: picking an order in Settings re-sorts the widget straight away, no need to wait for the next file change
+• In folder and all-lists widgets each list keeps its tasks together, so section headers stay in place while tasks sort within their own list

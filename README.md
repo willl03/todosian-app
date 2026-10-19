@@ -1,7 +1,7 @@
 <h1 align="center">Todosian</h1>
 
 <p align="center">
-  <a href="https://github.com/willl03/todosian-app/releases"><img src="https://img.shields.io/badge/release-2.2.0%2Bfork.4-6A40F9" alt="Release"></a>
+  <a href="https://github.com/willl03/todosian-app/releases"><img src="https://img.shields.io/badge/release-2.2.0%2Bfork.5-6A40F9" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-5030C0" alt="License"></a>
 </p>
 
@@ -10,7 +10,7 @@
 <p align="center">
   A personal, feature-rich fork of
   <a href="https://github.com/isotjs/todosian-app">isotjs/todosian-app</a>.
-  Versions follow <code>upstream+fork.N</code> (current: <b>2.2.0+fork.4</b>).
+  Versions follow <code>upstream+fork.N</code> (current: <b>2.2.0+fork.5</b>).
 </p>
 
 - **Folders & navigation** — group lists into folders with emoji badges, colors, and
@@ -18,7 +18,8 @@
   swipe between a folder's lists · a dedicated folder view for reordering
 - **Powerful widgets** — bind a widget to a list *or* a whole folder (lists shown with
   small headers, in your order) · the picker mirrors your folder structure · task
-  priorities on every row · an add button that follows the widget's binding
+  priorities on every row · follows your todo sort order, applied within each list ·
+  an add button that follows the widget's binding
 - **Better tasks** — one-line notes with clickable links · Todoist-style priorities
   (P1 red / P2 yellow / P3 blue / P4 default) · due date + priority sorting ·
   long-press Move/Delete · capitalized new entries
