@@ -1,8 +1,10 @@
 package com.isotjs.todosian.ui.components
 
+import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -18,6 +20,9 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 object TodosianDimens {
     val ScreenHorizontalPadding: Dp = 16.dp
@@ -169,5 +175,39 @@ fun TodosianLinearProgress(
         modifier = modifier
             .height(TodosianDimens.ProgressHeight)
             .clip(shape),
+    )
+}
+
+private const val PullRefreshMinVisibleMillis = 400L
+
+internal suspend fun awaitMinimumPullRefreshDuration(startedAtMillis: Long) {
+    val remaining = PullRefreshMinVisibleMillis - (SystemClock.elapsedRealtime() - startedAtMillis)
+    if (remaining > 0) delay(remaining)
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun TodosianPullToRefreshBox(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val state = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier,
+        state = state,
+        enabled = enabled,
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
+                state = state,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+        content = content,
     )
 }

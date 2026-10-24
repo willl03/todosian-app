@@ -1,6 +1,7 @@
 package com.isotjs.todosian.ui.home
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,9 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.Category
+import com.isotjs.todosian.data.settings.AppSettingsRepository
+import com.isotjs.todosian.ui.components.awaitMinimumPullRefreshDuration
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +21,7 @@ import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val folders: List<Folder> = emptyList(),
     val unfiledLists: List<Category> = emptyList(),
 ) {
@@ -35,6 +40,7 @@ data class HomeUiState(
 
 class HomeViewModel(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -46,15 +52,37 @@ class HomeViewModel(
         refresh()
     }
 
-    fun refresh(showLoading: Boolean = true, includeCounts: Boolean = true) {
-        viewModelScope.launch { doRefresh(showLoading, includeCounts) }
+    fun refresh(
+        showLoading: Boolean = true,
+        showRefreshing: Boolean = false,
+        includeCounts: Boolean = true,
+    ) {
+        if (showRefreshing && _uiState.value.isRefreshing) return
+        viewModelScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
+            if (showRefreshing) {
+                _uiState.value = _uiState.value.copy(isRefreshing = true)
+            }
+            try {
+                doRefresh(
+                    showLoading = showLoading,
+                    showRefreshing = showRefreshing,
+                    includeCounts = includeCounts,
+                )
+            } finally {
+                if (showRefreshing) {
+                    awaitMinimumPullRefreshDuration(startedAt)
+                    _uiState.value = _uiState.value.copy(isRefreshing = false)
+                }
+            }
+        }
     }
 
-    /** Awaitable refresh for pull-to-refresh: completes when the re-scan is done. */
-    suspend fun refreshNow(showLoading: Boolean = false, includeCounts: Boolean = true) =
-        doRefresh(showLoading, includeCounts)
-
-    private suspend fun doRefresh(showLoading: Boolean, includeCounts: Boolean) {
+    private suspend fun doRefresh(
+        showLoading: Boolean,
+        showRefreshing: Boolean = false,
+        includeCounts: Boolean,
+    ) {
         val folderUri = fileRepository.getFolderUri()
         if (folderUri == null) {
             _events.emit(Event.RequireOnboarding)
@@ -62,11 +90,13 @@ class HomeViewModel(
             return
         }
 
-        val shouldShowLoading = showLoading || _uiState.value.folders.isEmpty()
+        val shouldShowLoading =
+            !showRefreshing && (showLoading || _uiState.value.folders.isEmpty())
         if (shouldShowLoading) {
             _uiState.value = _uiState.value.copy(isLoading = true)
         }
-        val result = fileRepository.getVaultContent(includeCounts)
+        val markers = appSettingsRepository.settings.first().toTaskMarkers()
+        val result = fileRepository.getVaultContent(includeCounts, markers)
         if (result.isFailure) {
             fileRepository.clearFolderUri()
             _events.emit(Event.ShowMessage(R.string.error_folder_invalid))
@@ -76,7 +106,7 @@ class HomeViewModel(
         }
 
         val content = result.getOrThrow()
-        _uiState.value = HomeUiState(
+        _uiState.value = _uiState.value.copy(
             isLoading = false,
             folders = content.folders,
             unfiledLists = content.unfiledLists,

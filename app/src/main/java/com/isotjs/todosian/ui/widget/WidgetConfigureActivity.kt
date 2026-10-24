@@ -53,6 +53,7 @@ import com.isotjs.todosian.TodosianApplication
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
+import com.isotjs.todosian.utils.TaskMarkers
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.ThemeMode
 import com.isotjs.todosian.ui.components.TodosianDimens
@@ -141,6 +142,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 ) {
                     WidgetConfigureScreen(
                         fileRepository = app.fileRepository,
+                        markers = settings.toTaskMarkers(),
                         showCompleted = showCompleted.value,
                         onShowCompletedChange = { checked ->
                             showCompleted.value = checked
@@ -199,6 +201,7 @@ class WidgetConfigureActivity : ComponentActivity() {
 @Composable
 private fun WidgetConfigureScreen(
     fileRepository: FileRepository?,
+    markers: TaskMarkers,
     showCompleted: Boolean,
     onShowCompletedChange: (Boolean) -> Unit,
     onConfirm: (WidgetSelection) -> Unit,
@@ -208,12 +211,12 @@ private fun WidgetConfigureScreen(
     var isLoading by remember { mutableStateOf(fileRepository != null) }
     var pickerRows by remember { mutableStateOf<List<PickerRow<Category>>>(emptyList()) }
 
-    LaunchedEffect(fileRepository) {
+    LaunchedEffect(fileRepository, markers) {
         if (fileRepository == null) {
             isLoading = false
             return@LaunchedEffect
         }
-        val content = fileRepository.getVaultContent(includeCounts = true)
+        val content = fileRepository.getVaultContent(includeCounts = true, markers = markers)
             .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
         pickerRows = buildPickerRows<Category>(
             folders = content.folders.map { Triple(it.uri.toString(), it.displayName, it.lists) },

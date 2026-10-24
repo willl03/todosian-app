@@ -22,6 +22,7 @@ import com.isotjs.todosian.data.SafFileRepository
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.settings.SharedPrefsAppSettingsRepository
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TaskMarkers
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
@@ -54,7 +55,7 @@ object DueReminderNotifier {
         val folderUri = PreferencesManager(appContext).getFolderUri()
             ?: return false
 
-        val dueSoon = runCatching { loadDueSoonTodos(appContext, folderUri) }
+        val dueSoon = runCatching { loadDueSoonTodos(appContext, folderUri, settings.toTaskMarkers()) }
             .getOrElse { return false }
 
         if (dueSoon.isEmpty()) {
@@ -139,7 +140,11 @@ object DueReminderNotifier {
         NotificationManagerCompat.from(context.applicationContext).cancel(NOTIFICATION_ID)
     }
 
-    private fun loadDueSoonTodos(context: Context, folderUri: Uri): List<DueTodo> {
+    private fun loadDueSoonTodos(
+        context: Context,
+        folderUri: Uri,
+        markers: TaskMarkers,
+    ): List<DueTodo> {
         val root = DocumentFile.fromTreeUri(context, folderUri) ?: return emptyList()
         val today = LocalDate.now()
 
@@ -160,18 +165,23 @@ object DueReminderNotifier {
         return listFiles
             .asSequence()
             .flatMap { file ->
-                parseDueTodosFromFile(context, file, today).asSequence()
+                parseDueTodosFromFile(context, file, today, markers).asSequence()
             }
             .sortedWith(compareBy<DueTodo> { it.dueDate }.thenBy { it.text.lowercase() })
             .toList()
     }
 
-    private fun parseDueTodosFromFile(context: Context, file: DocumentFile, today: LocalDate): List<DueTodo> {
+    private fun parseDueTodosFromFile(
+        context: Context,
+        file: DocumentFile,
+        today: LocalDate,
+        markers: TaskMarkers,
+    ): List<DueTodo> {
         val lines = context.contentResolver.openInputStream(file.uri)?.use { input ->
             input.bufferedReader().readLines()
         } ?: return emptyList()
 
-        return MarkdownParser.parse(lines)
+        return MarkdownParser.parse(lines, markers)
             .asSequence()
             .filter { !it.isDone }
             .mapNotNull { todo -> mapDueTodo(todo, file, today) }

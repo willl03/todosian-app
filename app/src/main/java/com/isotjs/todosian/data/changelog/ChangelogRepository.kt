@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
@@ -103,6 +104,7 @@ object ChangelogRepository {
             "FilterCenterFocus" -> Icons.Filled.FilterCenterFocus
             "AutoAwesome" -> Icons.Filled.AutoAwesome
             "Checklist" -> Icons.Filled.Checklist
+            "Edit" -> Icons.Filled.Edit
             "SwapVert" -> Icons.Filled.SwapVert
             "Notifications" -> Icons.Filled.Notifications
             "SubdirectoryArrowRight" -> Icons.Filled.SubdirectoryArrowRight

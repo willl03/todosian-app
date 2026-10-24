@@ -244,6 +244,22 @@
     <string name="settings_tasks_plugin_ui_emojis">Use emojis in UI</string>
     <string name="settings_tasks_plugin_ui_emojis_subtitle">Show Tasks metadata as emojis instead of icons.</string>
 
+    <string name="settings_markers_title">Task markers</string>
+    <string name="settings_markers_subtitle">Customize the text used for task metadata. Leave a field blank to use the default.</string>
+    <string name="settings_marker_created">Created date marker</string>
+    <string name="settings_marker_start">Start date marker</string>
+    <string name="settings_marker_scheduled">Scheduled date marker</string>
+    <string name="settings_marker_due">Due date marker</string>
+    <string name="settings_marker_done">Done date marker</string>
+    <string name="settings_marker_recurrence">Recurrence marker</string>
+    <string name="settings_marker_default_hint">Default: %1$s</string>
+    <string name="settings_marker_example_created">e.g. created: 2026-05-20</string>
+    <string name="settings_marker_example_start">e.g. start: 2026-05-20</string>
+    <string name="settings_marker_example_scheduled">e.g. scheduled: 2026-05-20</string>
+    <string name="settings_marker_example_due">e.g. due: 2026-05-20</string>
+    <string name="settings_marker_example_done">e.g. done: 2026-05-20</string>
+    <string name="settings_marker_example_recurrence">e.g. repeat: every week</string>
+
     <string name="settings_enable_subtasks">Enable subtasks</string>
     <string name="settings_enable_subtasks_subtitle">Allow adding subtasks to todos.</string>
     <string name="settings_notification_permission_denied">Notifications are disabled, so due reminders cannot be shown.</string>

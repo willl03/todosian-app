@@ -81,6 +81,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
+import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.VaultContent
@@ -108,6 +109,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
@@ -126,6 +128,7 @@ data class FolderUiState(
 
 class FolderViewModel(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
     private val folderUri: Uri,
     val isUnfiled: Boolean,
     /** Order-file key for this folder's lists: the folder name, "" for unfiled. */
@@ -174,7 +177,13 @@ class FolderViewModel(
         val folderName = if (isUnfiled) "" else {
             fileRepository.getFolderDisplayName(folderUri).getOrNull().orEmpty()
         }
-        val listsResult = fileRepository.getCategoriesIn(folderUri, folderPath, includeCounts = true)
+        val markers = appSettingsRepository.settings.first().toTaskMarkers()
+        val listsResult = fileRepository.getCategoriesIn(
+            parentUri = folderUri,
+            parentPath = folderPath,
+            includeCounts = true,
+            markers = markers,
+        )
 
         _uiState.value = FolderUiState(
             isLoading = false,
@@ -454,6 +463,7 @@ class FolderPagerViewModel(
 @Composable
 fun FolderScreen(
     fileRepository: FileRepository,
+    appSettingsRepository: AppSettingsRepository,
     folderUri: Uri,
     isUnfiled: Boolean,
     onOpenList: (Uri) -> Unit,
@@ -533,6 +543,7 @@ fun FolderScreen(
         val page = pages.getOrNull(pageIndex) ?: return@HorizontalPager
         FolderPage(
             fileRepository = fileRepository,
+            appSettingsRepository = appSettingsRepository,
             folder = page,
             onOpenList = onOpenList,
             onBack = onBack,
@@ -548,6 +559,7 @@ fun FolderScreen(
 @Composable
 private fun FolderPage(
     fileRepository: FileRepository,
+    appSettingsRepository: AppSettingsRepository,
     folder: Folder,
     onOpenList: (Uri) -> Unit,
     onBack: () -> Unit,
@@ -560,6 +572,7 @@ private fun FolderPage(
         key = "folder_${folder.uri}",
         factory = FolderViewModelFactory(
             fileRepository = fileRepository,
+            appSettingsRepository = appSettingsRepository,
             folderUri = folder.uri,
             isUnfiled = isUnfiled,
             folderPath = folder.displayName,
@@ -1330,6 +1343,7 @@ private fun validateListNameForRename(input: String): RenameListValidation {
 
 private class FolderViewModelFactory(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
     private val folderUri: Uri,
     private val isUnfiled: Boolean,
     private val folderPath: String,
@@ -1338,7 +1352,14 @@ private class FolderViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FolderViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FolderViewModel(fileRepository, folderUri, isUnfiled, folderPath, seededLists) as T
+            return FolderViewModel(
+                fileRepository = fileRepository,
+                appSettingsRepository = appSettingsRepository,
+                folderUri = folderUri,
+                isUnfiled = isUnfiled,
+                folderPath = folderPath,
+                seededLists = seededLists,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

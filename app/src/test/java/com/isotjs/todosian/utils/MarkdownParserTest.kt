@@ -6,6 +6,15 @@ import org.junit.Test
 import java.time.LocalDate
 
 class MarkdownParserTest {
+    private val customMarkers = TaskMarkers(
+        created = "created:",
+        start = "start:",
+        scheduled = "scheduled:",
+        due = "due:",
+        done = "done:",
+        recurrence = "repeat:",
+    )
+
     @Test
     fun `todo ids are stable across re-parses of unchanged content`() {
         val lines = listOf(
@@ -661,5 +670,98 @@ class MarkdownParserTest {
         val todos = MarkdownParser.parse(listOf("- [ ] Plain task"))
 
         assertEquals(null, todos.single().note)
+    }
+
+    @Test
+    fun parse_uses_custom_markers() {
+        val lines = listOf(
+            "- [ ] Test created: 2023-04-13 start: 2023-04-15 due: 2023-04-16 repeat: every day",
+        )
+
+        val todos = MarkdownParser.parse(lines, customMarkers)
+        val todo = todos.single()
+        assertEquals("Test", todo.text)
+        assertEquals("2023-04-13", todo.createdDate)
+        assertEquals("2023-04-15", todo.startDate)
+        assertEquals("2023-04-16", todo.dueDate)
+        assertEquals("every day", todo.recurrence)
+    }
+
+    @Test
+    fun parse_custom_marker_without_space_before_value() {
+        val lines = listOf("- [ ] Test due:2023-04-16")
+
+        val todo = MarkdownParser.parse(lines, customMarkers).single()
+        assertEquals("2023-04-16", todo.dueDate)
+        assertEquals("Test", todo.text)
+    }
+
+    @Test
+    fun toggleLine_writes_custom_done_marker() {
+        val today = LocalDate.now().toString()
+        val lines = listOf("- [ ] Task due: 2024-01-02")
+
+        val toggled = MarkdownParser.toggleLine(
+            lines = lines,
+            lineIndex = 0,
+            enableTasksPlugin = true,
+            markers = customMarkers,
+        )
+        assertEquals("- [x] Task due: 2024-01-02 done: $today", toggled[0])
+    }
+
+    @Test
+    fun toggleLine_unchecking_removes_custom_done_marker() {
+        val lines = listOf("- [x] Task due: 2024-01-02 done: 2024-01-03")
+
+        val toggled = MarkdownParser.toggleLine(
+            lines = lines,
+            lineIndex = 0,
+            enableTasksPlugin = true,
+            markers = customMarkers,
+        )
+        assertEquals("- [ ] Task due: 2024-01-02", toggled[0])
+    }
+
+    @Test
+    fun addTodo_writes_custom_created_marker() {
+        val today = LocalDate.now().toString()
+        val updated = MarkdownParser.addTodo(
+            lines = emptyList(),
+            text = "New thing",
+            meta = null,
+            enableTasksPlugin = true,
+            markers = customMarkers,
+        )
+
+        assertEquals(listOf("- [ ] New thing created: $today"), updated)
+    }
+
+    @Test
+    fun toggleLine_recurring_with_custom_markers_advances() {
+        val today = LocalDate.of(2024, 3, 15)
+        val lines = listOf("- [ ] Water plants due: 2024-03-14 repeat: every day")
+
+        val result = MarkdownParser.toggleLine(
+            lines = lines,
+            lineIndex = 0,
+            enableTasksPlugin = true,
+            today = today,
+            markers = customMarkers,
+        )
+
+        assertEquals(2, result.size)
+        assertEquals("- [ ] Water plants due: 2024-03-15 repeat: every day", result[0])
+        assertEquals("- [x] Water plants due: 2024-03-14 repeat: every day done: 2024-03-15", result[1])
+    }
+
+    @Test
+    fun parse_escapes_regex_special_markers() {
+        val markers = TaskMarkers(due = "(due)")
+        val lines = listOf("- [ ] Test (due) 2024-01-02")
+
+        val todo = MarkdownParser.parse(lines, markers).single()
+        assertEquals("2024-01-02", todo.dueDate)
+        assertEquals("Test", todo.text)
     }
 }

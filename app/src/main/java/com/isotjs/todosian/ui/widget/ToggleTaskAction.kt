@@ -36,6 +36,7 @@ class ToggleTaskAction : ActionCallback {
 
         val settings = settingsRepository.settings.first()
         Log.d(TAG, "enableTasksPluginSupport=${settings.enableTasksPluginSupport}")
+        val markers = settings.toTaskMarkers()
 
         withContext(Dispatchers.IO) {
             val categoryUri = categoryUriString.toUri()
@@ -44,12 +45,12 @@ class ToggleTaskAction : ActionCallback {
                 var targetIndex = lineIndex
                 val candidate = lines.getOrNull(targetIndex)
                 val candidateText = candidate?.let {
-                    MarkdownParser.parse(listOf(it)).firstOrNull()?.text
+                    MarkdownParser.parse(listOf(it), markers).firstOrNull()?.text
                 }
 
                 if (candidateText != expectedText) {
                     val foundIndex = lines.indexOfFirst { line ->
-                        MarkdownParser.parse(listOf(line)).firstOrNull()?.text == expectedText
+                        MarkdownParser.parse(listOf(line), markers).firstOrNull()?.text == expectedText
                     }
                     if (foundIndex != -1) {
                         targetIndex = foundIndex
@@ -62,7 +63,7 @@ class ToggleTaskAction : ActionCallback {
                     }
                 }
 
-                val currentTodo = MarkdownParser.parse(listOf(lines[targetIndex])).firstOrNull()
+                val currentTodo = MarkdownParser.parse(listOf(lines[targetIndex]), markers).firstOrNull()
                 val isCheckedKey = ActionParameters.Key<Boolean>("androidx.glance.action.ActionParameters.ToggleableStateKey")
                 val intendedState = parameters[isCheckedKey]
                 if (intendedState != null && currentTodo != null && currentTodo.isDone == intendedState) {
@@ -74,6 +75,7 @@ class ToggleTaskAction : ActionCallback {
                     lines = lines,
                     lineIndex = targetIndex,
                     enableTasksPlugin = settings.enableTasksPluginSupport,
+                    markers = markers,
                 )
                 if (updatedLines == null) {
                     Log.w(TAG, "Unable to toggle line $targetIndex")

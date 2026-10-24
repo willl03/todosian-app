@@ -97,6 +97,7 @@ import com.isotjs.todosian.ui.components.TodoSheetMode
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
+import com.isotjs.todosian.ui.components.TodosianPullToRefreshBox
 import com.isotjs.todosian.ui.components.TodosianSectionHeader
 import com.isotjs.todosian.ui.components.todosianFabShape
 import com.isotjs.todosian.utils.MarkdownParser
@@ -142,6 +143,7 @@ fun CategoryScreen(
             parentPath = parentPath,
             parentFolderUri = parentFolderUri,
             seededTitle = seededTitle,
+            appSettingsRepository = appSettingsRepository,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -770,12 +772,18 @@ fun CategoryScreen(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        TodosianPullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refreshFromDisk(pullRefresh = true) },
+            enabled = !uiState.isLoading,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
+        ) {
             if (uiState.isLoading) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     TodosianLoadingIndicator()
@@ -786,14 +794,17 @@ fun CategoryScreen(
                 val anyTodos = uiState.activeTodos.isNotEmpty() ||
                     (settings.showCompleted && uiState.completedTodos.isNotEmpty())
                 if (!anyTodos) {
-                    TodosianEmptyState(
-                        icon = Icons.Outlined.Checklist,
-                        title = stringResource(R.string.category_empty_title),
-                        subtitle = stringResource(R.string.category_empty_subtitle),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
+                    // A scrollable empty state keeps the pull-to-refresh gesture available.
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        item {
+                            TodosianEmptyState(
+                                icon = Icons.Outlined.Checklist,
+                                title = stringResource(R.string.category_empty_title),
+                                subtitle = stringResource(R.string.category_empty_subtitle),
+                                modifier = Modifier.fillParentMaxSize(),
+                            )
+                        }
+                    }
                 } else {
 
                 val sortedActiveTodos = remember(uiState.activeTodos, settings.todoSort) {
@@ -815,10 +826,7 @@ fun CategoryScreen(
                 }
 
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     if (settings.todoGrouping == TodoGrouping.FILE_ORDER) {
                         items(
@@ -1015,11 +1023,19 @@ class CategoryViewModelFactory(
     private val parentPath: String = "",
     private val parentFolderUri: Uri? = null,
     private val seededTitle: String = "",
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CategoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return CategoryViewModel(fileRepository, categoryUri, parentPath, parentFolderUri, seededTitle) as T
+            return CategoryViewModel(
+                fileRepository = fileRepository,
+                categoryUri = categoryUri,
+                parentPath = parentPath,
+                parentFolderUri = parentFolderUri,
+                seededTitle = seededTitle,
+                appSettingsRepository = appSettingsRepository,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

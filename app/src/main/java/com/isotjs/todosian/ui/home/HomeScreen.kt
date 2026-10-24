@@ -53,7 +53,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -101,6 +100,7 @@ import com.isotjs.todosian.ui.components.DragReorderState
 import com.isotjs.todosian.ui.components.TodosianDimens
 import com.isotjs.todosian.ui.components.TodosianEmptyState
 import com.isotjs.todosian.ui.components.TodosianLoadingIndicator
+import com.isotjs.todosian.ui.components.TodosianPullToRefreshBox
 import com.isotjs.todosian.ui.components.dragReorderable
 import com.isotjs.todosian.ui.components.todosianFabShape
 import kotlinx.coroutines.flow.collectLatest
@@ -128,7 +128,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: HomeViewModel = viewModel(
-        factory = HomeViewModelFactory(fileRepository),
+        factory = HomeViewModelFactory(fileRepository, appSettingsRepository),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -426,20 +426,6 @@ fun HomeScreen(
         },
         modifier = modifier.fillMaxSize(),
     ) { padding ->
-        var isRefreshing by remember { mutableStateOf(false) }
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                isRefreshing = true
-                scope.launch {
-                    viewModel.refreshNow(showLoading = false, includeCounts = settings.showDailyFocus)
-                    isRefreshing = false
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
         // Folders A–Z (or manual order via the reorder feature); "Unfiled lists" is the last
         // row so its position matches the folder pager, where it is the rightmost page. It is
         // a virtual pseudo-folder: fixed at the bottom, not reorderable.
@@ -480,65 +466,79 @@ fun HomeScreen(
             }
         }
 
-        AnimatedContent(
-            targetState = contentState,
-            transitionSpec = {
-                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(160))
+        TodosianPullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = {
+                viewModel.refresh(
+                    showLoading = false,
+                    showRefreshing = true,
+                    includeCounts = settings.showDailyFocus,
+                )
             },
-            label = "home-content",
+            enabled = !uiState.isLoading,
             modifier = Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(horizontal = TodosianDimens.ScreenHorizontalPadding),
-        ) { state ->
-            when (state) {
-                HomeContentState.LOADING -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TodosianLoadingIndicator()
-                    }
-                }
-
-                HomeContentState.EMPTY -> {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        AnimatedVisibility(
-                            visible = settings.showDailyFocus,
-                            enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-                            exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
-                        ) {
-                            Column {
-                                DailyFocusBanner(
-                                    remaining = uiState.remainingFor(settings.dailyFocusMode),
-                                    mode = settings.dailyFocusMode,
-                                    onClick = onOpenDailyFocus,
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-                        }
-                        EmptyHomeState(
-                            onCreateFolder = { showNewFolderSheet = true },
+        ) {
+            AnimatedContent(
+                targetState = contentState,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(220)) togetherWith
+                        fadeOut(animationSpec = tween(160))
+                },
+                label = "home-content",
+                modifier = Modifier.fillMaxSize(),
+            ) { state ->
+                when (state) {
+                    HomeContentState.LOADING -> {
+                        Box(
                             modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-
-                HomeContentState.DATA -> {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        AnimatedVisibility(
-                            visible = settings.showDailyFocus,
-                            enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-                            exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Column {
-                                DailyFocusBanner(
-                                    remaining = uiState.remainingFor(settings.dailyFocusMode),
-                                    mode = settings.dailyFocusMode,
-                                    onClick = onOpenDailyFocus,
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
+                            TodosianLoadingIndicator()
                         }
+                    }
+
+                    HomeContentState.EMPTY -> {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            AnimatedVisibility(
+                                visible = settings.showDailyFocus,
+                                enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+                                exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                            ) {
+                                Column {
+                                    DailyFocusBanner(
+                                        remaining = uiState.remainingFor(settings.dailyFocusMode),
+                                        mode = settings.dailyFocusMode,
+                                        onClick = onOpenDailyFocus,
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
+                            EmptyHomeState(
+                                onCreateFolder = { showNewFolderSheet = true },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+
+                    HomeContentState.DATA -> {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            AnimatedVisibility(
+                                visible = settings.showDailyFocus,
+                                enter = fadeIn(tween(180)) + expandVertically(tween(220)),
+                                exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
+                            ) {
+                                Column {
+                                    DailyFocusBanner(
+                                        remaining = uiState.remainingFor(settings.dailyFocusMode),
+                                        mode = settings.dailyFocusMode,
+                                        onClick = onOpenDailyFocus,
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
 
                         LazyColumn(
                             state = listState,
@@ -621,10 +621,10 @@ fun HomeScreen(
                                 }
                             }
                         }
+                        }
                     }
                 }
             }
-        }
         }
     }
 }
@@ -856,11 +856,12 @@ private fun EmptyHomeState(
 
 private class HomeViewModelFactory(
     private val fileRepository: FileRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return HomeViewModel(fileRepository) as T
+            return HomeViewModel(fileRepository, appSettingsRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

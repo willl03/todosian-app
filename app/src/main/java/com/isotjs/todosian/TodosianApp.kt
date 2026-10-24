@@ -190,6 +190,7 @@ fun TodosianApp(
             val isUnfiled = backStackEntry.arguments?.getBoolean(Routes.ARG_FOLDER_UNFILED) ?: false
             FolderScreen(
                 fileRepository = fileRepository,
+                appSettingsRepository = appSettingsRepository,
                 folderUri = folderUri,
                 isUnfiled = isUnfiled,
                 onOpenList = { categoryUri ->

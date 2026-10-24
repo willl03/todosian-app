@@ -19,19 +19,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
@@ -40,6 +49,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,8 +62,11 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -61,6 +74,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,6 +113,7 @@ import com.isotjs.todosian.data.settings.TodoGrouping
 import com.isotjs.todosian.data.settings.TodoSort
 import com.isotjs.todosian.ui.components.ChangelogBottomSheet
 import com.isotjs.todosian.ui.components.TodosianSectionHeader
+import com.isotjs.todosian.utils.TaskMarkers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -148,6 +163,7 @@ fun SettingsScreen(
             when (event) {
                 is SettingsViewModel.Event.ShowMessage ->
                     snackbarHostState.showSnackbar(resources.getString(event.messageResId))
+
                 SettingsViewModel.Event.RequireOnboarding -> onRequireOnboarding()
             }
         }
@@ -166,6 +182,7 @@ fun SettingsScreen(
     var showResetDialog by remember { mutableStateOf(false) }
     var showDailyFocusModeDialog by remember { mutableStateOf(false) }
     var showReminderTimeDialog by remember { mutableStateOf(false) }
+    var showMarkersSheet by remember { mutableStateOf(false) }
 
     val reminderTimeLabel = remember(settings.reminderTimeHour, settings.reminderTimeMinute) {
         LocalTime.of(settings.reminderTimeHour, settings.reminderTimeMinute)
@@ -220,7 +237,10 @@ fun SettingsScreen(
             title = stringResource(R.string.settings_new_todo_file_position),
             options = listOf(
                 ChoiceOption(NewTodoFilePosition.TOP, stringResource(R.string.settings_new_todo_file_position_top)),
-                ChoiceOption(NewTodoFilePosition.BOTTOM, stringResource(R.string.settings_new_todo_file_position_bottom)),
+                ChoiceOption(
+                    NewTodoFilePosition.BOTTOM,
+                    stringResource(R.string.settings_new_todo_file_position_bottom)
+                ),
             ),
             selected = settings.newTodoFilePosition,
             onSelected = { appSettingsRepository.setNewTodoFilePosition(it) },
@@ -234,7 +254,10 @@ fun SettingsScreen(
             options = listOf(
                 ChoiceOption(DailyFocusMode.TODAY, stringResource(R.string.settings_daily_focus_mode_today)),
                 ChoiceOption(DailyFocusMode.OVERDUE, stringResource(R.string.settings_daily_focus_mode_overdue)),
-                ChoiceOption(DailyFocusMode.TODAY_AND_OVERDUE, stringResource(R.string.settings_daily_focus_mode_today_overdue)),
+                ChoiceOption(
+                    DailyFocusMode.TODAY_AND_OVERDUE,
+                    stringResource(R.string.settings_daily_focus_mode_today_overdue)
+                ),
             ),
             selected = settings.dailyFocusMode,
             onSelected = { appSettingsRepository.setDailyFocusMode(it) },
@@ -293,6 +316,16 @@ fun SettingsScreen(
                     Text(text = stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+
+    if (showMarkersSheet) {
+        TaskMarkersSheet(
+            settings = settings,
+            appSettingsRepository = appSettingsRepository,
+            // Marker changes alter the parsed metadata, so placed widgets must re-render.
+            onMarkersChanged = { fileRepository.scheduleWidgetRefresh() },
+            onDismiss = { showMarkersSheet = false },
         )
     }
 
@@ -500,9 +533,21 @@ fun SettingsScreen(
                                 SettingsDivider()
 
                                 SettingsNavRow(
+                                    icon = Icons.Filled.Edit,
+                                    title = stringResource(R.string.settings_markers_title),
+                                    subtitle = stringResource(R.string.settings_markers_subtitle),
+                                    onClick = { showMarkersSheet = true },
+                                )
+
+                                SettingsDivider()
+
+                                SettingsNavRow(
                                     icon = Icons.Filled.Schedule,
                                     title = stringResource(R.string.settings_reminder_time),
-                                    subtitle = stringResource(R.string.settings_reminder_time_subtitle, reminderTimeLabel),
+                                    subtitle = stringResource(
+                                        R.string.settings_reminder_time_subtitle,
+                                        reminderTimeLabel
+                                    ),
                                     onClick = { showReminderTimeDialog = true },
                                 )
                             }
@@ -714,6 +759,150 @@ private fun SettingsInfoRow(
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+}
+
+@Composable
+private fun SettingsTextFieldRow(
+    label: String,
+    value: String,
+    placeholder: String,
+    onValueChange: (String) -> Unit,
+    supporting: String? = null,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        label = { Text(text = label) },
+        placeholder = { Text(text = placeholder) },
+        supportingText = if (supporting != null) {
+            { Text(text = supporting) }
+        } else {
+            null
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskMarkersSheet(
+    settings: AppSettings,
+    appSettingsRepository: AppSettingsRepository,
+    onMarkersChanged: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    val scope = rememberCoroutineScope()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.75f)
+                .windowInsetsPadding(WindowInsets.ime)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_markers_title),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_markers_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_created),
+                value = settings.createdMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_created),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.created),
+                onValueChange = {
+                    appSettingsRepository.setCreatedMarker(it)
+                    onMarkersChanged()
+                },
+            )
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_start),
+                value = settings.startMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_start),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.start),
+                onValueChange = {
+                    appSettingsRepository.setStartMarker(it)
+                    onMarkersChanged()
+                },
+            )
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_scheduled),
+                value = settings.scheduledMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_scheduled),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.scheduled),
+                onValueChange = {
+                    appSettingsRepository.setScheduledMarker(it)
+                    onMarkersChanged()
+                },
+            )
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_due),
+                value = settings.dueMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_due),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.due),
+                onValueChange = {
+                    appSettingsRepository.setDueMarker(it)
+                    onMarkersChanged()
+                },
+            )
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_done),
+                value = settings.doneMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_done),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.done),
+                onValueChange = {
+                    appSettingsRepository.setDoneMarker(it)
+                    onMarkersChanged()
+                },
+            )
+            SettingsTextFieldRow(
+                label = stringResource(R.string.settings_marker_recurrence),
+                value = settings.recurrenceMarker.orEmpty(),
+                placeholder = stringResource(R.string.settings_marker_example_recurrence),
+                supporting = stringResource(R.string.settings_marker_default_hint, TaskMarkers.Default.recurrence),
+                onValueChange = {
+                    appSettingsRepository.setRecurrenceMarker(it)
+                    onMarkersChanged()
+                },
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(horizontal = 16.dp),
+            ) {
+                Text(text = stringResource(R.string.action_ok))
+            }
+        }
+    }
 }
 
 @Composable

@@ -13,6 +13,7 @@ import com.isotjs.todosian.data.model.Folder
 import com.isotjs.todosian.data.model.Category
 import com.isotjs.todosian.data.model.VaultContent
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TaskMarkers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,15 +64,27 @@ interface FileRepository {
      * Full vault layout: real folders plus the root-level "Unfiled lists" pseudo-folder.
      * With [includeCounts] = false the todo counts are not computed (files are not read or
      * parsed at all) — use it wherever the counts are not displayed, e.g. a names-only scan.
+     * [markers] selects the Tasks-plugin metadata tokens the parser recognizes.
      */
-    suspend fun getVaultContent(includeCounts: Boolean): Result<VaultContent>
+    suspend fun getVaultContent(
+        includeCounts: Boolean,
+        markers: TaskMarkers = TaskMarkers.Default,
+    ): Result<VaultContent>
 
     /** Every list in the vault, flattened across folders (for widgets, daily focus, pickers). */
-    suspend fun getCategories(includeCounts: Boolean): Result<List<Category>>
+    suspend fun getCategories(
+        includeCounts: Boolean = true,
+        markers: TaskMarkers = TaskMarkers.Default,
+    ): Result<List<Category>>
 
     /** Lists directly inside [parentUri] (the vault root for unfiled lists, or a folder),
      *  ordered by the manual order file for [parentPath] ("" = unfiled), then A–Z. */
-    suspend fun getCategoriesIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<Category>>
+    suspend fun getCategoriesIn(
+        parentUri: Uri,
+        parentPath: String,
+        includeCounts: Boolean,
+        markers: TaskMarkers = TaskMarkers.Default,
+    ): Result<List<Category>>
 
     suspend fun readLines(uri: Uri): Result<List<String>>
 
@@ -235,7 +248,10 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getVaultContent(includeCounts: Boolean): Result<VaultContent> {
+    override suspend fun getVaultContent(
+        includeCounts: Boolean,
+        markers: TaskMarkers,
+    ): Result<VaultContent> {
         val folderUri = getFolderUri() ?: return Result.success(VaultContent(emptyList(), emptyList()))
         return withContext(Dispatchers.IO) {
             runCatching {
@@ -256,7 +272,7 @@ class SafFileRepository(
                             lists = dir.listFiles()
                                 .asSequence()
                                 .filter { it.isFile }
-                                .mapNotNull { parseCategoryFile(it, includeCounts) }
+                                .mapNotNull { parseCategoryFile(it, includeCounts, markers) }
                                 .toList(),
                         )
                     }
@@ -279,7 +295,7 @@ class SafFileRepository(
 
                 val unfiledLists = children.asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseCategoryFile(it, includeCounts) }
+                    .mapNotNull { parseCategoryFile(it, includeCounts, markers) }
                     .toList()
 
                 VaultContent(
@@ -294,11 +310,19 @@ class SafFileRepository(
         }
     }
 
-    override suspend fun getCategories(includeCounts: Boolean): Result<List<Category>> {
-        return getVaultContent(includeCounts).mapCatching { it.allLists() }
+    override suspend fun getCategories(
+        includeCounts: Boolean,
+        markers: TaskMarkers,
+    ): Result<List<Category>> {
+        return getVaultContent(includeCounts, markers).mapCatching { it.allLists() }
     }
 
-    override suspend fun getCategoriesIn(parentUri: Uri, parentPath: String, includeCounts: Boolean): Result<List<Category>> {
+    override suspend fun getCategoriesIn(
+        parentUri: Uri,
+        parentPath: String,
+        includeCounts: Boolean,
+        markers: TaskMarkers,
+    ): Result<List<Category>> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 // Works for both the vault root tree URI and a folder's document URI:
@@ -311,7 +335,7 @@ class SafFileRepository(
                 val lists = parent.listFiles()
                     .asSequence()
                     .filter { it.isFile }
-                    .mapNotNull { parseCategoryFile(it, includeCounts) }
+                    .mapNotNull { parseCategoryFile(it, includeCounts, markers) }
                     .toList()
 
                 ListOrder.effective(
@@ -328,7 +352,11 @@ class SafFileRepository(
      * With [includeCounts] = false the file is not opened at all and all counts stay 0 —
      * the names-only scans (home rows, pagers, pickers) get a full-speed pass.
      */
-    private fun parseCategoryFile(file: DocumentFile, includeCounts: Boolean): Category? {
+    private fun parseCategoryFile(
+        file: DocumentFile,
+        includeCounts: Boolean,
+        markers: TaskMarkers,
+    ): Category? {
         val name = file.name
         if (!isCategoryFileName(name)) return null
         val displayName = name.orEmpty().removeSuffix(".md")
@@ -343,7 +371,7 @@ class SafFileRepository(
             )
         }
         val lines = readLinesInternal(file.uri)
-        val todos = MarkdownParser.parse(lines)
+        val todos = MarkdownParser.parse(lines, markers)
         val doneCount = todos.count { it.isDone }
         val today = LocalDate.now().toString()
         val activeTodos = todos.filter { !it.isDone }

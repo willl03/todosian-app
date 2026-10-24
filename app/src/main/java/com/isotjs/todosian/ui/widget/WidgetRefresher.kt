@@ -27,6 +27,7 @@ import com.isotjs.todosian.data.model.TasksPriority
 import com.isotjs.todosian.data.settings.AppSettings
 import com.isotjs.todosian.data.settings.TodoSort
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TaskMarkers
 import com.isotjs.todosian.utils.TodoSorter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -352,11 +353,11 @@ object WidgetRefresher {
             Log.w(TAG, "Unable to access file repository")
             return
         }
-
         refreshMutex.withLock {
             val settings = app.appSettingsRepository.settings.first()
             val priorityLabels = priorityLabels(context, settings.tasksPluginUseEmojisInUi)
-            val content = fileRepository.getVaultContent(includeCounts = false)
+            val markers = settings.toTaskMarkers()
+            val content = fileRepository.getVaultContent(includeCounts = false, markers = markers)
                 .getOrDefault(VaultContent(folders = emptyList(), unfiledLists = emptyList()))
             val categories = content.allLists()
             val widgetStates = glanceIds.map { glanceId ->
@@ -397,6 +398,7 @@ object WidgetRefresher {
                     showCompleted = showCompletedFlags[index],
                     priorityLabels = priorityLabels,
                     todoSort = settings.todoSort,
+                    markers = markers,
                 )
                 runCatching {
                     updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
@@ -465,6 +467,7 @@ object WidgetRefresher {
         showCompleted: Boolean,
         priorityLabels: Map<TasksPriority, String>,
         todoSort: TodoSort,
+        markers: TaskMarkers,
     ): WidgetSnapshot {
         val categories = content.allLists()
 
@@ -496,6 +499,7 @@ object WidgetRefresher {
                 priorityLabels = priorityLabels,
                 selectedFolderUri = resolvedFolder.uri.toString(),
                 todoSort = todoSort,
+                markers = markers,
             )
         }
 
@@ -527,6 +531,7 @@ object WidgetRefresher {
             priorityLabels = priorityLabels,
             selectedFolderUri = null,
             todoSort = todoSort,
+            markers = markers,
         )
     }
 
@@ -546,11 +551,12 @@ object WidgetRefresher {
         priorityLabels: Map<TasksPriority, String>,
         selectedFolderUri: String? = null,
         todoSort: TodoSort = TodoSort.FILE_ORDER,
+        markers: TaskMarkers = TaskMarkers.Default,
     ): WidgetSnapshot {
         val taskItems = sortTaskItemsPerList(
             items = scopedCategories.flatMap { category ->
                 val lines = linesByUri[category.uri].orEmpty()
-                MarkdownParser.parse(lines).map { todo ->
+                MarkdownParser.parse(lines, markers).map { todo ->
                     WidgetTaskItem(
                         categoryUri = category.uri.toString(),
                         listName = category.displayName,

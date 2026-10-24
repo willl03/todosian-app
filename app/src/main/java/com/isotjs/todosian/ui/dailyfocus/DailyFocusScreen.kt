@@ -95,6 +95,7 @@ fun DailyFocusScreen(
             fileRepository = fileRepository,
             mode = settings.dailyFocusMode,
             enableTasksPluginSupport = settings.enableTasksPluginSupport,
+            appSettingsRepository = appSettingsRepository,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -350,6 +351,7 @@ private class DailyFocusViewModelFactory(
     private val fileRepository: FileRepository,
     private val mode: DailyFocusMode,
     private val enableTasksPluginSupport: Boolean,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DailyFocusViewModel::class.java)) {
@@ -358,6 +360,7 @@ private class DailyFocusViewModelFactory(
                 fileRepository = fileRepository,
                 mode = mode,
                 enableTasksPluginSupport = enableTasksPluginSupport,
+                appSettingsRepository = appSettingsRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

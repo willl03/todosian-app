@@ -25,6 +25,18 @@ interface AppSettingsRepository {
 
     fun setTasksPluginUseEmojisInUi(enabled: Boolean)
 
+    fun setCreatedMarker(marker: String)
+
+    fun setStartMarker(marker: String)
+
+    fun setScheduledMarker(marker: String)
+
+    fun setDueMarker(marker: String)
+
+    fun setDoneMarker(marker: String)
+
+    fun setRecurrenceMarker(marker: String)
+
     fun setEnableSubtasks(enabled: Boolean)
 
     fun setReminderTime(hour: Int, minute: Int)
@@ -93,6 +105,30 @@ class SharedPrefsAppSettingsRepository(
         prefs.edit { putBoolean(KEY_TASKS_PLUGIN_UI_EMOJIS, enabled) }
     }
 
+    override fun setCreatedMarker(marker: String) {
+        prefs.edit { putString(KEY_CREATED_MARKER, marker.trim()) }
+    }
+
+    override fun setStartMarker(marker: String) {
+        prefs.edit { putString(KEY_START_MARKER, marker.trim()) }
+    }
+
+    override fun setScheduledMarker(marker: String) {
+        prefs.edit { putString(KEY_SCHEDULED_MARKER, marker.trim()) }
+    }
+
+    override fun setDueMarker(marker: String) {
+        prefs.edit { putString(KEY_DUE_MARKER, marker.trim()) }
+    }
+
+    override fun setDoneMarker(marker: String) {
+        prefs.edit { putString(KEY_DONE_MARKER, marker.trim()) }
+    }
+
+    override fun setRecurrenceMarker(marker: String) {
+        prefs.edit { putString(KEY_RECURRENCE_MARKER, marker.trim()) }
+    }
+
     override fun setEnableSubtasks(enabled: Boolean) {
         prefs.edit { putBoolean(KEY_SUBTASKS, enabled) }
     }
@@ -134,6 +170,12 @@ class SharedPrefsAppSettingsRepository(
             newTodoFilePosition = newTodoFilePosition,
             enableTasksPluginSupport = prefs.getBoolean(KEY_TASKS_PLUGIN, false),
             tasksPluginUseEmojisInUi = prefs.getBoolean(KEY_TASKS_PLUGIN_UI_EMOJIS, false),
+            createdMarker = prefs.getString(KEY_CREATED_MARKER, null)?.takeIf { it.isNotBlank() },
+            startMarker = prefs.getString(KEY_START_MARKER, null)?.takeIf { it.isNotBlank() },
+            scheduledMarker = prefs.getString(KEY_SCHEDULED_MARKER, null)?.takeIf { it.isNotBlank() },
+            dueMarker = prefs.getString(KEY_DUE_MARKER, null)?.takeIf { it.isNotBlank() },
+            doneMarker = prefs.getString(KEY_DONE_MARKER, null)?.takeIf { it.isNotBlank() },
+            recurrenceMarker = prefs.getString(KEY_RECURRENCE_MARKER, null)?.takeIf { it.isNotBlank() },
             enableSubtasks = prefs.getBoolean(KEY_SUBTASKS, false),
             reminderTimeHour = prefs.getInt(KEY_REMINDER_TIME_HOUR, 19),
             reminderTimeMinute = prefs.getInt(KEY_REMINDER_TIME_MINUTE, 0),
@@ -155,6 +197,13 @@ class SharedPrefsAppSettingsRepository(
         private const val KEY_TASKS_PLUGIN = "tasks_plugin_support"
 
         private const val KEY_TASKS_PLUGIN_UI_EMOJIS = "tasks_plugin_ui_emojis"
+
+        private const val KEY_CREATED_MARKER = "created_marker"
+        private const val KEY_START_MARKER = "start_marker"
+        private const val KEY_SCHEDULED_MARKER = "scheduled_marker"
+        private const val KEY_DUE_MARKER = "due_marker"
+        private const val KEY_DONE_MARKER = "done_marker"
+        private const val KEY_RECURRENCE_MARKER = "recurrence_marker"
 
         private const val KEY_SUBTASKS = "enable_subtasks"
 

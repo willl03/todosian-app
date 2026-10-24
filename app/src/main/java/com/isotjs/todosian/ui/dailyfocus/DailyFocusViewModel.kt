@@ -9,8 +9,10 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.Todo
 import com.isotjs.todosian.data.model.priorityRank
+import com.isotjs.todosian.data.settings.AppSettingsRepository
 import com.isotjs.todosian.data.settings.DailyFocusMode
 import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TaskMarkers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,6 +46,7 @@ class DailyFocusViewModel(
     private val fileRepository: FileRepository,
     val mode: DailyFocusMode,
     val enableTasksPluginSupport: Boolean,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DailyFocusUiState(isLoading = true))
@@ -78,12 +82,16 @@ class DailyFocusViewModel(
 
     fun refreshFromDisk(showLoading: Boolean = true) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             if (showLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
             val today = LocalDate.now().toString()
-            val listsResult = fileRepository.getCategories(includeCounts = false)
+            val listsResult = fileRepository.getCategories(
+                includeCounts = false,
+                markers = markers,
+            )
             if (listsResult.isFailure) {
                 _uiState.value = DailyFocusUiState(isLoading = false)
                 return@launch
@@ -103,7 +111,7 @@ class DailyFocusViewModel(
                 lineCache[uriKey] = lines
                 listNames[uriKey] = list.displayName
 
-                MarkdownParser.parse(lines)
+                MarkdownParser.parse(lines, markers)
                     .filter { !it.isDone }
                     .filter { todo -> matchesFocusMode(todo, mode, today) }
                     .forEach { todo ->
@@ -128,11 +136,13 @@ class DailyFocusViewModel(
 
     fun toggleTodo(task: DailyFocusTask) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = currentLinesFor(task)
             val newLines = MarkdownParser.tryToggleLine(
                 lines = previousLines,
                 lineIndex = task.todo.lineIndex,
                 enableTasksPlugin = enableTasksPluginSupport,
+                markers = markers,
             )
             if (newLines == null) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
@@ -140,14 +150,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.categoryUri, newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.categoryUri, previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -163,6 +173,7 @@ class DailyFocusViewModel(
         meta: MarkdownParser.TasksMeta?,
     ) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = currentLinesFor(task)
             val newLines = if (enableTasksPluginSupport) {
                 MarkdownParser.editTodo(
@@ -171,9 +182,10 @@ class DailyFocusViewModel(
                     newText = newText,
                     meta = meta,
                     enableTasksPlugin = true,
+                    markers = markers,
                 )
             } else {
-                val updated = MarkdownParser.tryEditTodoText(previousLines, task.todo.lineIndex, newText)
+                val updated = MarkdownParser.tryEditTodoText(previousLines, task.todo.lineIndex, newText, markers)
                 if (updated == null) {
                     _events.emit(Event.ShowMessage(R.string.error_read_failed))
                     refreshFromDisk(showLoading = false)
@@ -182,14 +194,14 @@ class DailyFocusViewModel(
                 updated
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.categoryUri, newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.categoryUri, previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -201,6 +213,7 @@ class DailyFocusViewModel(
 
     fun deleteTodo(task: DailyFocusTask) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = currentLinesFor(task)
             val newLines = MarkdownParser.tryDeleteTodoWithSubtasks(previousLines, task.todo.lineIndex)
             if (newLines == null) {
@@ -209,14 +222,14 @@ class DailyFocusViewModel(
                 return@launch
             }
 
-            applyLines(task.categoryUri, newLines)
+            applyLines(task.categoryUri, newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(task.categoryUri, newLines)
                 if (write.isFailure) {
                     if (currentLinesFor(task) == newLines) {
-                        applyLines(task.categoryUri, previousLines)
+                        applyLines(task.categoryUri, previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -233,8 +246,11 @@ class DailyFocusViewModel(
     private fun currentLinesFor(task: DailyFocusTask): List<String> =
         _uiState.value.lineCache[task.categoryUri.toString()] ?: emptyList()
 
+    private suspend fun currentMarkers(): TaskMarkers =
+        appSettingsRepository.settings.first().toTaskMarkers()
+
     // Replicates the logic from refreshFromDisk but only for a single file, used for optimistic updates after mutations.
-    private fun applyLines(categoryUri: Uri, newLines: List<String>) {
+    private fun applyLines(categoryUri: Uri, newLines: List<String>, markers: TaskMarkers) {
         val today = LocalDate.now().toString()
         val current = _uiState.value
         val uriKey = categoryUri.toString()
@@ -248,7 +264,7 @@ class DailyFocusViewModel(
             val uri = uriString.toUri()
             val listName = current.listNames[uriString] ?: continue
 
-            MarkdownParser.parse(lines)
+            MarkdownParser.parse(lines, markers)
                 .filter { !it.isDone }
                 .filter { todo -> matchesFocusMode(todo, mode, today) }
                 .forEach { todo ->

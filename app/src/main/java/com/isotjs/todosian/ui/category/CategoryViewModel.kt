@@ -1,6 +1,7 @@
 package com.isotjs.todosian.ui.category
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,9 +9,12 @@ import com.isotjs.todosian.R
 import com.isotjs.todosian.data.FileRepository
 import com.isotjs.todosian.data.model.MoveFolderTarget
 import com.isotjs.todosian.data.model.Todo
-import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.data.settings.AppSettingsRepository
+import com.isotjs.todosian.ui.components.awaitMinimumPullRefreshDuration
 import com.isotjs.todosian.ui.components.PickerRow
 import com.isotjs.todosian.ui.components.buildPickerRows
+import com.isotjs.todosian.utils.MarkdownParser
+import com.isotjs.todosian.utils.TaskMarkers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 data class ListUiState(
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val title: String = "",
     val activeTodos: List<Todo> = emptyList(),
     val completedTodos: List<Todo> = emptyList(),
@@ -50,6 +56,7 @@ class CategoryViewModel(
     private val parentFolderUri: Uri? = null,
     /** List name from the pager scan; seeds the title before the file is read. */
     private val seededTitle: String = "",
+    private val appSettingsRepository: AppSettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListUiState(isLoading = true, title = seededTitle))
@@ -85,41 +92,57 @@ class CategoryViewModel(
         }
     }
 
-    fun refreshFromDisk(showLoading: Boolean = false, skipIfFresh: Boolean = false) {
+    fun refreshFromDisk(
+        showLoading: Boolean = false,
+        skipIfFresh: Boolean = false,
+        pullRefresh: Boolean = false,
+    ) {
         if (skipIfFresh && System.currentTimeMillis() - lastScanAtMs < RESCAN_MIN_INTERVAL_MS) return
         lastScanAtMs = System.currentTimeMillis()
+        if (pullRefresh && _uiState.value.isRefreshing) return
         viewModelScope.launch {
-            if (showLoading) {
-                _uiState.value = _uiState.value.copy(isLoading = true)
+            val startedAt = SystemClock.elapsedRealtime()
+            if (pullRefresh) {
+                _uiState.value = _uiState.value.copy(isRefreshing = true)
             }
+            try {
+                val markers = currentMarkers()
+                if (showLoading) {
+                    _uiState.value = _uiState.value.copy(isLoading = true)
+                }
 
-            val nameResult = fileRepository.getDisplayName(categoryUri)
-            val title = nameResult.getOrNull()?.removeSuffix(".md").orEmpty()
+                val nameResult = fileRepository.getDisplayName(categoryUri)
+                val title = nameResult.getOrNull()?.removeSuffix(".md").orEmpty()
 
-            val linesResult = fileRepository.readLines(categoryUri)
-            if (linesResult.isFailure) {
-                _events.emit(Event.ShowMessage(R.string.error_read_failed))
-                // Keep the last known title: a failed read must not blank the header (the
-                // stale read typically follows a rename whose rescan is already re-keying
-                // this page onto the renamed document).
-                _uiState.value = _uiState.value.copy(isLoading = false)
-                return@launch
+                val linesResult = fileRepository.readLines(categoryUri)
+                if (linesResult.isFailure) {
+                    _events.emit(Event.ShowMessage(R.string.error_read_failed))
+                    // Keep the last known title: a failed read must not blank the header (the
+                    // stale read typically follows a rename whose rescan is already re-keying
+                    // this page onto the renamed document).
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    return@launch
+                }
+
+                val lines = linesResult.getOrThrow()
+                if (!showLoading && lines == _uiState.value.lines) return@launch
+
+                val todos = MarkdownParser.parse(lines, markers)
+                val (completed, active) = todos.partition { it.isDone }
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    title = title,
+                    activeTodos = active.sortedBy { it.lineIndex },
+                    completedTodos = completed.sortedBy { it.lineIndex },
+                    lines = lines,
+                )
+            } finally {
+                if (pullRefresh) {
+                    awaitMinimumPullRefreshDuration(startedAt)
+                    _uiState.value = _uiState.value.copy(isRefreshing = false)
+                }
             }
-
-            val lines = linesResult.getOrThrow()
-            if (!showLoading && lines == _uiState.value.lines) return@launch
-
-            val todos = MarkdownParser.parse(lines)
-            val (completed, active) = todos.partition { it.isDone }
-
-            _uiState.value = ListUiState(
-                isLoading = false,
-                title = title,
-                activeTodos = active.sortedBy { it.lineIndex },
-                completedTodos = completed.sortedBy { it.lineIndex },
-                lines = lines,
-                moveTargets = _uiState.value.moveTargets,
-            )
         }
     }
 
@@ -245,11 +268,13 @@ class CategoryViewModel(
 
     fun toggleTodo(todo: Todo, enableTasksPluginSupport: Boolean) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = MarkdownParser.tryToggleLine(
                 lines = previousLines,
                 lineIndex = todo.lineIndex,
                 enableTasksPlugin = enableTasksPluginSupport,
+                markers = markers,
             )
             if (newLines == null) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
@@ -257,14 +282,14 @@ class CategoryViewModel(
                 return@launch
             }
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -281,6 +306,7 @@ class CategoryViewModel(
         addAtStart: Boolean = false,
     ) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = MarkdownParser.addTodo(
                 lines = previousLines,
@@ -288,17 +314,18 @@ class CategoryViewModel(
                 meta = meta,
                 enableTasksPlugin = enableTasksPluginSupport,
                 addAtStart = addAtStart,
+                markers = markers,
             )
             if (newLines == previousLines) return@launch
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -315,6 +342,7 @@ class CategoryViewModel(
         enableTasksPluginSupport: Boolean,
     ) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = MarkdownParser.addSubTodo(
                 lines = previousLines,
@@ -322,6 +350,7 @@ class CategoryViewModel(
                 text = text,
                 meta = meta,
                 enableTasksPlugin = enableTasksPluginSupport,
+                markers = markers,
             )
             if (newLines == null) {
                 _events.emit(Event.ShowMessage(R.string.error_read_failed))
@@ -329,14 +358,14 @@ class CategoryViewModel(
                 return@launch
             }
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -353,6 +382,7 @@ class CategoryViewModel(
         enableTasksPluginSupport: Boolean,
     ) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = if (enableTasksPluginSupport) {
                 MarkdownParser.editTodo(
@@ -361,9 +391,10 @@ class CategoryViewModel(
                     newText = newText,
                     meta = meta,
                     enableTasksPlugin = true,
+                    markers = markers,
                 )
             } else {
-                val updated = MarkdownParser.tryEditTodoText(previousLines, todo.lineIndex, newText)
+                val updated = MarkdownParser.tryEditTodoText(previousLines, todo.lineIndex, newText, markers)
                 if (updated == null) {
                     _events.emit(Event.ShowMessage(R.string.error_read_failed))
                     refreshFromDisk(showLoading = false)
@@ -372,14 +403,14 @@ class CategoryViewModel(
                 updated
             }
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -391,6 +422,7 @@ class CategoryViewModel(
 
     fun deleteTodo(todo: Todo) {
         viewModelScope.launch {
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = MarkdownParser.tryDeleteTodoWithSubtasks(previousLines, todo.lineIndex)
             if (newLines == null) {
@@ -399,14 +431,14 @@ class CategoryViewModel(
                 return@launch
             }
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val write = fileRepository.writeLines(categoryUri, newLines)
                 if (write.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 }
@@ -422,6 +454,7 @@ class CategoryViewModel(
                 _events.emit(Event.ShowMessage(R.string.category_move_subtask_disabled))
                 return@launch
             }
+            val markers = currentMarkers()
             val previousLines = _uiState.value.lines
             val newLines = MarkdownParser.tryDeleteTodoWithSubtasks(previousLines, todo.lineIndex)
             if (newLines == null) {
@@ -430,14 +463,14 @@ class CategoryViewModel(
                 return@launch
             }
 
-            applyLines(newLines)
+            applyLines(newLines, markers)
 
             inFlightWrites.incrementAndGet()
             try {
                 val result = fileRepository.moveTodoLine(categoryUri, targetUri, todo.lineIndex)
                 if (result.isFailure) {
                     if (_uiState.value.lines == newLines) {
-                        applyLines(previousLines)
+                        applyLines(previousLines, markers)
                     }
                     _events.emit(Event.ShowMessage(R.string.error_write_failed))
                 } else {
@@ -472,8 +505,8 @@ class CategoryViewModel(
         }
     }
 
-    private fun applyLines(lines: List<String>) {
-        val todos = MarkdownParser.parse(lines)
+    private fun applyLines(lines: List<String>, markers: TaskMarkers) {
+        val todos = MarkdownParser.parse(lines, markers)
         val (completed, active) = todos.partition { it.isDone }
         _uiState.value = _uiState.value.copy(
             activeTodos = active.sortedBy { it.lineIndex },
@@ -482,6 +515,9 @@ class CategoryViewModel(
             moveTargets = _uiState.value.moveTargets,
         )
     }
+
+    private suspend fun currentMarkers(): TaskMarkers =
+        appSettingsRepository.settings.first().toTaskMarkers()
 
     sealed interface Event {
         data class ShowMessage(@param:StringRes val messageResId: Int) : Event
