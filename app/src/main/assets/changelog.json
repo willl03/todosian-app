@@ -1,5 +1,26 @@
 [
   {
+    "versionCode": 10006,
+    "versionName": "2.2.0+fork.6",
+    "items": [
+      {
+        "icon": "Edit",
+        "title": "Custom Task Markers",
+        "description": "Choose the text used for created, start, scheduled, due, done and recurrence metadata. Plain-text vaults like \"due: 2026-10-24\" now work without rewriting files - and folders, Daily Focus, reminders and widgets all agree."
+      },
+      {
+        "icon": "Swipe",
+        "title": "Pull to Refresh in Lists",
+        "description": "Pull down inside any list to re-read it from disk, with the same minimum-visible indicator as Home."
+      },
+      {
+        "icon": "AutoAwesome",
+        "title": "Upstream 2.2 Merged",
+        "description": "Todosian now sits on upstream's final 2.2 release. Folders, sections, widget bindings, sorting, notes and priorities are unchanged."
+      }
+    ]
+  },
+  {
     "versionCode": 10005,
     "versionName": "2.2.0+fork.5",
     "items": [

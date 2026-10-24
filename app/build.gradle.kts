@@ -20,8 +20,8 @@ android {
         targetSdk = 37
         // Fork versioning: versionCode = <upstream code> * 1000 + <fork build>;
         // versionName = "<upstream version>+fork.<build>".
-        versionCode = 10005
-        versionName = "2.2.0+fork.5"
+        versionCode = 10006
+        versionName = "2.2.0+fork.6"
     }
 
     val keystoreProperties = Properties().apply {

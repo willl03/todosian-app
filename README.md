@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/willl03/todosian-app/actions"><img src="https://img.shields.io/github/actions/workflow/status/willl03/todosian-app/ci.yml?label=CI&color=7C3AED" alt="CI"></a>
-  <a href="https://github.com/willl03/todosian-app/releases"><img src="https://img.shields.io/badge/release-2.2.0%2Bfork.5-6A40F9" alt="Release"></a>
+  <a href="https://github.com/willl03/todosian-app/releases"><img src="https://img.shields.io/badge/release-2.2.0%2Bfork.6-6A40F9" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-5030C0" alt="License"></a>
 </p>
 
@@ -11,7 +11,7 @@
 <p align="center">
   A personal, feature-rich fork of
   <a href="https://github.com/isotjs/todosian-app">isotjs/todosian-app</a>.
-  Versions follow <code>upstream+fork.N</code> (current: <b>2.2.0+fork.5</b>).
+  Versions follow <code>upstream+fork.N</code> (current: <b>2.2.0+fork.6</b>).
 </p>
 
 - **Folders & navigation** — group lists into folders with emoji badges, colors, and

@@ -1,0 +1,11 @@
+Sixth fork release, based on upstream 2.2.
+
+New:
+• Custom task markers: the Tasks-plugin date, done and recurrence tokens can be changed in Settings, so vaults that use plain-text markers (due:, done:, repeat:) work without rewriting files
+• Pull to refresh inside any list, with the same minimum-visible indicator as Home
+• Home now uses one consistent pull-to-refresh implementation
+
+Under the hood:
+• Upstream's final 2.2 is merged in: custom markers, pull to refresh, CI, refreshed screenshots
+• Custom markers are honoured in folder counts, Daily Focus, reminders and widgets, and changing a marker re-renders placed widgets immediately
+• Folder navigation, section paging, widget bindings, sorting, notes and priorities are unchanged
