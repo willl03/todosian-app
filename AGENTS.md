@@ -65,8 +65,7 @@ Note: the app works with any folder you pick via SAF. Many users point it at an 
 5. Prioritize performance, battery efficiency, and maintainability in all code contributions. Always consider the impact of your changes on the overall user experience and app performance.
 6. If you have any doubts ask a human contributor. Never make assumptions about the requirements or implementation details without clarification.
 7. If you do not test your changes using the instructions in the next section, you will be faced with reprimands from human contributors and may be asked to redo your work. Always ensure that you test your changes thoroughly before asking for a final review.
-8. You are absolutely **not allowed to bump the version** of the app in ANY way. Version bumps are only done by the core development team after manual review.
-9. **adb access is revoked.** Never interact with a connected device: no installs, screencaps, screen recordings, logcat, or shell commands on the device. Instead, after finishing a build, provide the exact `adb install` command for the human to run themselves and let them report the results back.
+8. **adb access is revoked.** Never interact with a connected device: no installs, screencaps, screen recordings, logcat, or shell commands on the device. Instead, after finishing a build, provide the exact `adb install` command for the human to run themselves and let them report the results back.
 
 ## Building and testing your changes
 
@@ -153,7 +152,7 @@ When modifying file access logic:
 
 When preparing for a release:
 
-1. **Do NOT bump version numbers** - this is done by core maintainers only
+1. Bump the version in `app/build.gradle.kts` using the fork scheme: `versionCode = <upstream code> * 1000 + <fork build>`, `versionName = <upstream version>+fork.<build>` (for example `10006` / `2.2.0+fork.6`)
 2. Update changelogs in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
 3. Ensure no proprietary dependencies are introduced
 4. Verify that no network permissions are added (check `AndroidManifest.xml`)
@@ -273,18 +272,18 @@ Before submitting your work for review:
 ## Signing Release Builds Locally
 
 1. The Gradle release signing config reads credentials from `keystore.properties` (or `TODOSIAN_RELEASE_*` environment variables). When those are absent, `:app:assembleRelease` produces `app-release-unsigned.apk`.
-2. For local testing, sign the unsigned APK with the Android debug keystore (the same one used by debug builds, so the APK installs over previous locally built releases):
+2. For local testing, sign the unsigned APK with the Android debug keystore (the same one used by debug builds, so the APK installs over previous locally built releases). Name the output `todosian-<versionName>.apk`, using the exact `versionName` from `app/build.gradle.kts` (e.g. `todosian-2.2.0+fork.6.apk`) so downloads, tags and changelogs stay aligned:
    ```bash
    apksigner sign \
      --ks ~/.android/debug.keystore \
      --ks-key-alias androiddebugkey \
      --ks-pass pass:android \
      --key-pass pass:android \
-     --out app/build/outputs/apk/release/app-release-signed.apk \
+     --out "app/build/outputs/apk/release/todosian-<versionName>.apk" \
      app/build/outputs/apk/release/app-release-unsigned.apk
    ```
 3. The `apksigner` binary ships with the Android SDK build tools (use the highest installed version).
-4. Verify the result before handing it off: `apksigner verify --print-certs app/build/outputs/apk/release/app-release-signed.apk`.
+4. Verify the result before handing it off: `apksigner verify --print-certs "app/build/outputs/apk/release/todosian-<versionName>.apk"`.
 5. Debug-keystore-signed builds are for local testing only. Never publish them (F-Droid/Play builds are signed by their own processes).
 
 ## Questions?
