@@ -764,4 +764,48 @@ class MarkdownParserTest {
         assertEquals("2024-01-02", todo.dueDate)
         assertEquals("Test", todo.text)
     }
+
+    /**
+     * Custom markers are upstream's feature and notes are the fork's; they share one suffix, so
+     * this guards the seam: custom tokens must round-trip with the note written last.
+     */
+    @Test
+    fun `custom markers round-trip together with a note`() {
+        val meta = MarkdownParser.TasksMeta(
+            dueDate = "2026-10-24",
+            priority = TasksPriority.HIGH,
+            note = "see the linked doc",
+        )
+        val line = "- [ ] Task" + meta.toSuffixString(customMarkers)
+
+        assertEquals("- [ ] Task due: 2026-10-24 ⏫ 📝 see the linked doc", line)
+
+        val parsed = MarkdownParser.parse(listOf(line), customMarkers).single()
+        assertEquals("Task", parsed.text)
+        assertEquals("2026-10-24", parsed.dueDate)
+        assertEquals(TasksPriority.HIGH, parsed.priority)
+        assertEquals("see the linked doc", parsed.note)
+    }
+
+    @Test
+    fun `toggle with custom markers keeps the note and writes the custom done token`() {
+        val today = LocalDate.of(2024, 3, 15)
+        val lines = listOf("- [ ] Water plants due: 2024-03-14 📝 patio only")
+
+        val line = MarkdownParser.toggleLine(
+            lines = lines,
+            lineIndex = 0,
+            enableTasksPlugin = true,
+            today = today,
+            markers = customMarkers,
+        ).single()
+
+        assertEquals("- [x] Water plants due: 2024-03-14 📝 patio only done: 2024-03-15", line)
+
+        val parsed = MarkdownParser.parse(listOf(line), customMarkers).single()
+        assertEquals("Water plants", parsed.text)
+        assertEquals("2024-03-14", parsed.dueDate)
+        assertEquals("2024-03-15", parsed.completionDate)
+        assertEquals("patio only", parsed.note)
+    }
 }
